@@ -1,0 +1,114 @@
+use iced::{
+    Element, Length,
+    alignment::{Horizontal, Vertical},
+    padding,
+    widget::{button, column, image, row, rule, scrollable, space, text},
+};
+
+use crate::{
+    core::instance::GruntInstance,
+    ui::{
+        GruntAction, GruntState,
+        views::{self, ScreenOutput, add_instance},
+    },
+};
+
+#[derive(Clone)]
+pub struct Screen {
+    selected_instance: Option<usize>,
+}
+//Enumerated usize instance id for selection
+type InstanceId = usize;
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    SelectInstance(InstanceId),
+    AddInstance,
+}
+
+impl Screen {
+    pub fn new() -> Self {
+        Self {
+            selected_instance: None,
+        }
+    }
+
+    fn instance(&self, id: InstanceId, instance: &GruntInstance) -> Element<'_, Message> {
+        button(
+            column![
+                image("assets/icons/logo.png").height(80.0).width(80.0),
+                text!("{}", instance.name).wrapping(text::Wrapping::Glyph)
+            ]
+            .height(Length::Shrink)
+            .width(Length::Fixed(100.0))
+            .align_x(Horizontal::Center)
+            .spacing(10.0),
+        )
+        .on_press(Message::SelectInstance(id))
+        .style(move |theme, status| {
+            let mut status = status;
+            if let Some(selected_instance) = &self.selected_instance
+                && *selected_instance == id
+            {
+                status = button::Status::Pressed;
+            }
+            button::Style {
+                ..button::subtle(theme, status)
+            }
+        })
+        .into()
+    }
+    pub fn view(&self, state: &GruntState) -> Element<'_, Message> {
+        column![
+            //Topbar
+            row![
+                button("Add Instance").on_press(Message::AddInstance),
+                rule::vertical(2),
+                button("Settings")
+            ]
+            .padding(padding::all(10.0))
+            .spacing(10.0)
+            .height(Length::Shrink)
+            .align_y(Vertical::Center),
+            rule::horizontal(1.0),
+            row![
+                //Instances
+                scrollable(
+                    row(state
+                        .instances
+                        .iter()
+                        .enumerate()
+                        .map(|(i, instance)| self.instance(i, instance)))
+                    .spacing(10.0)
+                    .padding(padding::all(10.0))
+                    .width(Length::Fill)
+                    .wrap()
+                ),
+                //Sidebar
+                column![
+                    text("Selected instance"),
+                    button("Launch").padding(padding::horizontal(30.0).vertical(7.0))
+                ]
+                .align_x(Horizontal::Center)
+                .width(Length::Shrink)
+                .spacing(10.0)
+                .padding(padding::all(10.0))
+            ]
+        ]
+        .into()
+    }
+    pub fn update(&mut self, message: Message) -> ScreenOutput<Message> {
+        use GruntAction::*;
+        match message {
+            Message::AddInstance => {
+                return ScreenOutput::action(SwitchScreen(views::Screen::AddInstance(
+                    add_instance::Screen::new(),
+                )));
+            }
+            Message::SelectInstance(id) => {
+                self.selected_instance = Some(id);
+            }
+        }
+        ScreenOutput::none()
+    }
+}
