@@ -1,0 +1,1189 @@
+<div
+  style="
+    font-family:
+      -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto,
+      Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 960px;
+    margin: 0 auto;
+    background: #f0ebe0;
+    padding: 24px;
+    border-radius: 6px;
+  "
+>
+  <p>
+    <img
+      src="https://raw.githubusercontent.com/Algernon733/WatershedsConfig/refs/heads/main/flowingstream.webp"
+      alt=""
+      width="900"
+      height="506"
+    />
+  </p>
+
+  <p
+    style="
+      background: #d4edda;
+      border: 1px solid #a3d4ad;
+      border-radius: 4px;
+      padding: 12px 14px;
+      margin: 0 0 12px;
+      color: #2d5a3a;
+      font-size: 0.95em;
+      line-height: 1.6;
+    "
+  >
+    <strong><span style="text-decoration: underline">New info</span></strong
+    ><strong><br />Big performance update out with 6.4.0</strong><br />Chunks
+    generate much faster now. <br />If you're making a fresh world, try
+    increasing the max stream length from what you're used to.<br />If you're
+    updating an existing world, make a backup of your moddata folder and save
+    file just in case. <br />I tested it and found it compatible with a 6.3.7
+    world, but you never know.
+  </p>
+
+  <p>
+    Watersheds expands on Vintage Story's rich worldgen, modelling how water
+    flows through terrain to carve out large-scale hydrological features.
+  </p>
+
+  <p>
+    This terrain-aware watershed model is completely unique, and allows the
+    creation of world generation features that previously haven't been possible
+    with an infinite world.
+  </p>
+
+  <p>&nbsp;</p>
+
+  <p>
+    The first thing Watersheds does is lift the terrain, then erode it towards
+    the coastline, creating a natural slope from inland highlands to flat
+    beaches and marshes.<br />Streams are pathed upwards through the eroded
+    terrain's slopes, starting from lakes, seas and oceans. These streams are
+    carved where you would realistically expect them to be, following flow paths
+    from simulated rainfall on the actual terrain's slopes.
+  </p>
+
+  <p>
+    <br />By making these streams aware of the terrain, they can be placed
+    following the terrain height. They start high up inland, then slowly get
+    wider as they flow downstream and downhill.
+  </p>
+
+  <p>
+    Along the path downhill Watersheds can generate crazy meandering streams,
+    braided streams, tributary streams, canyons, waterfalls, stream valleys,
+    oxbow lakes, rapids, point bars, and more, all within the context of the
+    surrounding terrain.
+  </p>
+
+  <p>&nbsp;</p>
+
+  <p>
+    Watersheds can even accumulate groundwater (optional) where you would expect
+    it to be based on the rainfall and terrain shape. You can dig water wells
+    into the groundwater aquifers and collect water from them with a bucket and
+    pulley.
+  </p>
+
+  <p>&nbsp;</p>
+
+  <p>
+    Watersheds is built from the start to be heavily configurable. Everything is
+    optional.
+  </p>
+
+  <p>You have control over every feature this mod gives you.</p>
+
+  <p>
+    You could make the meandering more bulbous for more oxbow lakes, deepen and
+    widen the aquifers, increase the size of the sandy beaches, or put more
+    rocks and fish in the streams.
+  </p>
+
+  <p>
+    Check out what you can do in the config editor here:
+    <a
+      style="color: #0066cc; text-decoration: none"
+      href="https://algernon733.github.io/WatershedsConfig/"
+      target="_blank"
+      rel="noopener"
+      >https://algernon733.github.io/WatershedsConfig/</a
+    >
+  </p>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🛠 Setup
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p>For short, safe, boring streams just download and play.</p>
+
+      <p>
+        The really cool world generation like in the pictures requires a few
+        steps:
+      </p>
+
+      <p style="padding-left: 40px">
+        <strong>1.</strong> Use Watersheds on fresh worlds only. You can take
+        the mod off later, but there will be seams between chunks generated with
+        and without the mod.<br /><strong>2.</strong> Use a
+        <a href="#landforms">landforms mod</a>. Vanilla landforms give poor
+        results for streams.
+      </p>
+
+      <p style="padding-left: 40px">
+        <strong>3.</strong> Pick your preset, then settings in the
+        <a
+          href="https://algernon733.github.io/WatershedsConfig/"
+          target="_blank"
+          rel="noopener"
+          >config editor</a
+        >.
+      </p>
+
+      <p style="padding-left: 40px">
+        <strong>4.</strong> Use these world settings:
+      </p>
+      <img
+        src="https://raw.githubusercontent.com/Algernon733/WatershedsConfig/refs/heads/main/worldsettings1.png"
+        alt=""
+        width="244"
+        height="117"
+      /><img
+        src="https://raw.githubusercontent.com/Algernon733/WatershedsConfig/refs/heads/main/worldsettings2.png"
+        alt=""
+        width="400"
+        height="147"
+      /><br />
+      <p>
+        70% landcover is to create oceans for streams to drain into. This makes
+        30% of the world surface ocean.
+      </p>
+
+      <p>
+        Lowering landcover scale from 500% to 100% makes smaller, more numerous
+        oceans.
+      </p>
+
+      <p>Upheaval gives poor quality terrain for streams.</p>
+
+      <p>
+        Lowering landcover means theres a greater chance your spawnpoint is
+        inside an ocean (a ~30% chance at 70% landcover and 100% landcover
+        scale). The game places a small island around you so you don't drown,
+        but you're still on an island in the middle of an ocean. So if you start
+        on an island fly out of the ocean in creative or tp ~4k blocks away.
+      </p>
+
+      <p>
+        <strong>The most important setting:</strong> Increasing landform scale.
+        This makes regions less chaotic, and more distinct from one another.
+        You're effectively scaling up how much land each terrain pattern gets;
+        larger lakes, larger plains, larger valleys, larger mountain ranges.
+        More landform scale makes the world feel bigger, and also gives more
+        room for streams to form.
+      </p>
+
+      <p>&nbsp;</p>
+
+      <p>
+        Worldgen time takes longer as this terrain gen needs to check faraway
+        areas. You should test the generation time you're comfortable with by
+        running around once you've waited some time (like 5 minutes) for the
+        watershed model to read the surrounding area. Once enough chunks have
+        generated in your area, chunk generation time is almost as fast as
+        without the mod.
+      </p>
+
+      <p>
+        If it's too slow on your machine, use a dedicated server or lower the
+        maximum stream length config.
+      </p>
+
+      <p>&nbsp;</p>
+
+      <p>
+        <a id="landforms"></a>For landforms, if you're using a tall world height
+        (world looks bigger, but runs slower) I recommend using my
+        <a href="https://mods.vintagestory.at/watershedslandforms"
+          ><strong>512 World Height Landforms</strong></a
+        >. If you're using a lower world height you should pick another landform
+        mod.
+      </p>
+
+      <p><strong>256 world height landform mods:</strong></p>
+
+      <p>
+        <a
+          href="https://mods.vintagestory.at/plainsandvalleys"
+          target="_blank"
+          rel="noopener"
+          >Plains and Valleys,</a
+        >
+        <a
+          href="https://mods.vintagestory.at/fieldsandplateaus"
+          target="_blank"
+          rel="noopener"
+          >Fields and Plateaus,</a
+        >
+        <a href="https://mods.vintagestory.at/show/mod/35113"
+          >World Of Fortune</a
+        >
+        <a
+          href="https://mods.vintagestory.at/show/mod/49247"
+          target="_blank"
+          rel="noopener"
+          >Vistas Beyond</a
+        >
+      </p>
+
+      <p><strong>320 world height landform mods:</strong></p>
+
+      <p>
+        <a
+          href="https://mods.vintagestory.at/vanillaplus"
+          target="_blank"
+          rel="noopener"
+          >Vanilla Plus Landforms</a
+        >,
+        <a
+          href="https://mods.vintagestory.at/conquestlandformoverhaul"
+          target="_blank"
+          rel="noopener"
+          >Conquest Landform Overhaul</a
+        >,
+      </p>
+
+      <p><strong>384 world height landform mods:</strong></p>
+
+      <p>
+        <a
+          href="https://mods.vintagestory.at/terraprety"
+          target="_blank"
+          rel="noopener"
+          >TerraPrety</a
+        >
+        is my personal favorite.<br />Hate to say it but I think it's better
+        than my landforms, even though its made for a shorter world height.
+      </p>
+
+      <p>
+        <em
+          >Turn off Watershed's coastal erosion (off by default) when playing
+          with TP, and be mindful that the Rivers mod is very slow in
+          combination with Terra Prety.</em
+        >
+      </p>
+
+      <p>&nbsp;</p>
+
+      <p>
+        If you want to play a world with <strong>dirt gravity&nbsp;</strong>use
+        <strong
+          ><a
+            href="https://mods.vintagestory.at/show/mod/24289"
+            target="_blank"
+            rel="noopener"
+            >Soil Must Fall</a
+          ></strong
+        >
+        instead and set block gravity in the world settings to "Sand and
+        gravel". This mod (with that world setting)
+        <strong>perfectly fixes dirt gravity</strong>. If you have block gravity
+        set to "soil with sideways instability" that mod will actually make dirt
+        gravity <strong>worse</strong>.<br />This mod is also useful to prevent
+        FPS drops from lots of falling blocks:
+        <a
+          href="https://mods.vintagestory.at/fallingspawnmanager"
+          target="_blank"
+          rel="noopener"
+          >https://mods.vintagestory.at/fallingspawnmanager</a
+        >
+      </p>
+
+      <p>
+        In vanilla dirt gravity collapses soil on mountains when they're loaded,
+        or when you walk on them. That same soil collapse can happen on stream
+        banks, so when the streams are loaded in or you walk near them, dirt can
+        collapse into the streambed and break the streams apart.
+      </p>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      ⚓ Stability
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 12px">
+        We've had three full playthroughs with Watersheds during its
+        development, and haven't had any crashes caused by the mod.<br />However,
+        it is still in an experimental state regarding the quality of the
+        streams.<br />You could find some artifacts in the form of bad water
+        placement, low-quality stream mouth connections to the drain/main
+        stream, or a stream pathing where it shouldn't be.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        Since these streams are height-conscious, they follow and carve into the
+        terrain generation's blended layers of chaotic noise. The chaotic noise
+        is what makes the streams distinct, since defining them by the
+        surrounding terrain means no two streams look the same. That chaos,
+        though, also creates a massive number of little edge cases that can mess
+        a stream up. Getting the carving right for these streams is a game of
+        whack-a-mole to deal with rare noise generation artifacts, so just like
+        how you sometimes find floating terrain, you're sometimes going to find
+        a busted-up stream section.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        The quality of your results also depends on how suited your terrain is
+        for a clean watershed model. In general, flat terrain makes boring
+        streams, and sloped terrain makes varied and dynamic streams. Rough and
+        crazy terrain shapes are fine provided they're in a rough and crazy
+        area. But when there's rough and crazy terrain interspersed throughout
+        all the terrain, the terrain sampling can miss the craziness and treat a
+        rough area as a smooth slope where water flows through.
+      </p>
+
+      <p style="margin: 0">
+        In practice, this means to use Watersheds, you'll want to turn off
+        upheaval, turn up the landform scale to 200%+, and use a landform mod.
+        Pretty much all landform mods go for a less chaotic, more distinctive
+        approach than vanilla, so they're all good. Vanilla landforms go heavy
+        on unpredictability. That unpredictability makes every location very
+        unique, but it isn't ideal for a model that predicts the terrain slopes.
+      </p>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🏞️The Watershed Model
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 12px">
+        The Watershed model maps a cheap abstraction of the terrain around you,
+        and how water would flow through that terrain.<br />This addresses the
+        core issue of terrain-based stream generation that AlcatrazEscapee (TFC
+        developer) identified in
+        <a
+          style="color: #0066cc; text-decoration: none"
+          href="https://alcatrazescapee.com/rivers/"
+          >their article here</a
+        >.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        That issue is that streams need to have context about the surrounding
+        terrain if you want them to flow down the terrain slopes. And if you
+        want to have context about the surrounding terrain, you'll need to look
+        at an exponentially increasing amount of possible terrain where a stream
+        could flow.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        The longer a stream can get, the more terrain you'll need to check.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        By breaking apart the base game terrain generation to the point you can
+        just check the terrain at individual points, you only have to cheaply
+        check spread-out points on the world around you, and use them to build
+        an estimate of your greater surroundings.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        The details between the samples are lost, but it's still detailed enough
+        to deterministically decide where streams of a reasonable length can be
+        placed. If the determinism requirement was removed, these streams could
+        be more than 20x as long with the same performance, but that's not ideal
+        for most.
+      </p>
+
+      <p style="margin: 0 0 12px">&nbsp;</p>
+
+      <p style="margin: 0 0 10px">
+        Streams are just one thing you can make with this. Knowing the terrain
+        thousands of blocks away from you opens up a massive amount of other
+        possibilities.&nbsp;
+      </p>
+
+      <p>
+        Check out my terrain sampler for details and ideas of what you could
+        make:
+        <a
+          href="https://mods.vintagestory.at/algernonsterrainsampler"
+          target="_blank"
+          rel="noopener"
+          >https://mods.vintagestory.at/algernonsterrainsampler</a
+        >
+      </p>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🛶Stream Types
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 12px">
+        Right now there are three types of streams: <strong>Straight</strong>,
+        <strong>Meandering</strong>, and <strong>Braided</strong>.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>Straight streams</strong> are simple curves with a little bit of
+        noise added to make them wobble.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <img
+          src="https://raw.githubusercontent.com/Algernon733/WatershedsConfig/refs/heads/main/straight.jpg"
+          alt=""
+          width="850"
+          height="478"
+        />
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>Meandering streams</strong> are curves that are gradually warped
+        into natural-looking meanders.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <img
+          src="https://raw.githubusercontent.com/Algernon733/WatershedsConfig/refs/heads/main/meandering.jpg"
+          alt=""
+          width="850"
+          height="478"
+        />
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>Braided streams</strong> are multiple meandering streams layered
+        at different opacities onto each other, creating the appearance of a
+        stream that evolved its path over time due to sediment deposition and
+        eroding the stream banks.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <img
+          src="https://raw.githubusercontent.com/Algernon733/WatershedsConfig/refs/heads/main/braided.jpg"
+          alt=""
+          width="850"
+          height="478"
+        />
+      </p>
+
+      <p style="margin: 0">
+        Each stream has a deterministic random chance of being one of these
+        three. The chances for each are configurable.
+      </p>
+
+      <p style="margin: 0">
+        There are also tributary streams that can branch off each stream if
+        there's good enough terrain to do so.
+      </p>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🪷🐟What You Will Find in Streams
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 12px">
+        Just like with real streams, they have a lot going on inside and around
+        them.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>The bed</strong> is full of stones, including flint and
+        boulders. Vintage Story's freshwater plants and algae are placed heavily
+        to make it look natural and alive underwater.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>The bank</strong> has a lot of clustered freshwater plants, like
+        cattails, papyrus, tule, and brown sedge. You'll find driftwood and
+        rotten logs that fell into the stream and washed up on the banks.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>The water</strong> has increased fish spawn rates, so you can
+        survive by spearfishing along the streams.
+      </p>
+
+      <p style="margin: 0">
+        <strong>The area around streams</strong> has a lot more trees and bushes
+        thanks to increased moisture levels, so you'll see branches and vines
+        hanging over the water.
+      </p>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      💧Groundwater and 🪣Wells
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 12px">
+        The groundwater feature works by seeping water out the walls when you
+        dig in an area that accumulated water flow in the water flow model. So
+        if the terrain is sloped towards an area, that area becomes "wet" and
+        can become a source of freshwater if you dig a well.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        They can also become a limiting factor for where you can dig tunnels, so
+        if you don't want a flooded mineshaft you should dig in a dry area,
+        above, ontop, or away from sloped terrain.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        <strong>Groundwater is disabled by default</strong>; you'll have to turn
+        it on in the config to play with it. For my mates, they got annoyed from
+        having to place blocks to prevent water spawning when they dug
+        mineshafts in aquifers. Just like with cave-ins, people either like
+        groundwater or hate it.
+      </p>
+
+      <p style="margin: 0 0 12px">
+        This doesn't interfere with caving or deeper mining at all, since
+        groundwater only exists for a couple of blocks near the surface
+        (adjustable in config).
+      </p>
+
+      <p style="margin: 0">
+        The well pulley is cross-compatible with groundwater wells/pulleys and
+        Hydrate or Diedrate's wells/pulleys. I actually only found out about
+        them after I made the pulley, otherwise I wouldn't have bothered making
+        it.
+      </p>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🪢Mod Compatibility
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 10px">
+        Any mod that doesn't edit the terrain generation (<code
+          style="
+            font-family: monospace;
+            background: #ddd8cc;
+            padding: 1px 5px;
+            border-radius: 3px;
+          "
+          >genTerra.cs</code
+        >) should be compatible. These mods edit genTerra and unfortunately
+        break Watersheds:
+      </p>
+
+      <ul style="margin: 0 0 14px; padding-left: 24px">
+        <li style="margin-bottom: 6px">
+          <strong
+            ><a
+              href="https://mods.vintagestory.at/rivers"
+              target="_blank"
+              rel="noopener"
+              >Rivers mod</a
+            >:</strong
+          >
+          Incompatible on 1.21, compatible on 1.22 as of Watersheds 5.0
+        </li>
+
+        <li style="margin-bottom: 6px">
+          <a
+            href="https://mods.vintagestory.at/rivergen"
+            target="_blank"
+            rel="noopener"
+            ><strong>RiverGen</strong></a
+          ><strong>:</strong> Incompatible
+        </li>
+
+        <li style="margin-bottom: 6px">
+          <strong
+            ><a
+              href="https://mods.vintagestory.at/iwantrealisticworlds"
+              target="_blank"
+              rel="noopener"
+              >I Want Realistic Worlds</a
+            >: </strong
+          >Incompatible. Results in broken worldgen when paired with Watersheds,
+          haven't checked why
+        </li>
+
+        <li style="margin-bottom: 6px">
+          <strong
+            ><a
+              href="https://mods.vintagestory.at/geologyaddons"
+              target="_blank"
+              rel="noopener"
+              >Geology Additions</a
+            >:&nbsp;</strong
+          >Incompatible on 1.21, compatible on 1.22
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      <strong>⭐</strong>Recommended mods
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 12px">
+        I always use these mods with Watersheds for my playthroughs:
+      </p>
+
+      <ul>
+        <li style="margin-bottom: 6px">
+          <a
+            href="https://mods.vintagestory.at/rivers"
+            target="_blank"
+            rel="noopener"
+            >Rivers mod</a
+          >: Compatible as of Watersheds 5.0.
+          <ul>
+            <li style="margin-bottom: 6px">
+              My height-following streams flow into his massive rivers, creating
+              tributary networks up to the 5th order.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/terrainslabs"
+            target="_blank"
+            rel="noopener"
+            >Terrain Slabs</a
+          >
+          - IMO a must have, it makes streams and the whole world look really
+          natural and less blocky like Minecraft.
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/conquestblocklayeroverhaul"
+            target="_blank"
+            rel="noopener"
+            >Conquest Blocklayer Overhaul</a
+          >
+          - Changes the blocks on the hills and mountains, making it look much
+          more realistic.
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/geologyaddons"
+            target="_blank"
+            rel="noopener"
+            >Geology Additions</a
+          >
+          and
+          <a
+            href="https://mods.vintagestory.at/rockstratavariety"
+            target="_blank"
+            rel="noopener"
+            >Rock Strata Variety</a
+          >
+          - Varied geology makes the world more varied.
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/show/mod/21831"
+            target="_blank"
+            rel="noopener"
+            >Continental World</a
+          >
+          - I just prefer the world to be divided up into large continents and
+          islands.
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/hydrateordiedrate"
+            target="_blank"
+            rel="noopener"
+            >Hydrate or Diedrate</a
+          >
+          and
+          <a
+            href="https://mods.vintagestory.at/waterfall"
+            target="_blank"
+            rel="noopener"
+            >Waterfall</a
+          >
+          - Helps give groundwater a reason to exist.&nbsp;
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/show/mod/45756"
+            target="_blank"
+            rel="noopener"
+            >Seamless Rapids</a
+          >
+          - Changes the appearance of rapid water to better match the flowing
+          water around it
+        </li>
+
+        <li>
+          <a
+            href="https://mods.vintagestory.at/show/mod/47815"
+            target="_blank"
+            rel="noopener"
+            >Realistic Biome Generation</a
+          >
+          and or
+          <a
+            href="https://mods.vintagestory.at/customlatitude"
+            target="_blank"
+            rel="noopener"
+            >Custom Latitude</a
+          >
+          - Better control over your world's latitude
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🌅Future Features
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p style="margin: 0 0 10px">Some things I'm thinking about trying out:</p>
+
+      <ul style="margin: 0; padding-left: 24px">
+        <li style="margin-bottom: 7px">
+          <strong>Done with terrain erosion:</strong> Erosion based on the
+          Watershed model.
+        </li>
+
+        <li style="margin-bottom: 7px">
+          Detaching stream mouths from a single potential drain, letting them
+          meander to form deltas or alluvial fans if the terrain is right.
+        </li>
+
+        <li style="margin-bottom: 7px">
+          Map effects around streams to make large-scale river valleys or
+          large-scale wetlands/flood meadows, and move moisture to where water
+          flows/accumulates.
+        </li>
+
+        <li style="margin-bottom: 7px">
+          <strong>Done with the new rapids:</strong> A different block for
+          stream water that resembles flowing water, with whitewater when it
+          gets rough, as opposed to the current freshwater blocks made for
+          stillwater ponds and lakes.
+        </li>
+
+        <li style="margin-bottom: 7px">
+          <strong>Done with the Rivers mod:</strong> Compatibility for my
+          streams with another mod's very large-scale flat rivers. So that my
+          height-based streams can drain into them, forming tributaries in
+          massive river systems.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div
+    class="spoiler"
+    style="
+      border: 1px solid #cfc9be;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: #eee9de;
+    "
+  >
+    <div
+      class="spoiler-toggle"
+      style="
+        padding: 12px 15px;
+        background: #e5dfd4;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #333;
+        text-align: center;
+      "
+    >
+      🔩Troubleshooting
+    </div>
+
+    <div
+      class="spoiler-text"
+      style="
+        padding: 15px;
+        font-size: 0.95em;
+        line-height: 1.6;
+        color: #333;
+        background: #eee9de;
+        border-top: 1px solid #cfc9be;
+      "
+    >
+      <p>
+        <strong>Void world?&nbsp;<br /></strong>Delete your "Cache" folder in
+        <em>%appdata%\\Roaming\\VintagestoryData</em> . Then check if you have
+        incompatible mods enabled
+      </p>
+
+      <p>
+        <strong><br />Granite world?</strong><br />Check for incompatible
+        mods<br /><br /><strong>Too slow/low ram?<br /></strong>Lower your max
+        stream length, performance scales with this value.
+      </p>
+
+      <p>
+        CPU and RAM use is negligible at the default 11 length, but still
+        doesn't use much at higher lengths either (hard capped at 4gb ram, never
+        seen it reach that number).
+      </p>
+
+      <p>
+        RAM use scales harder with taller world heights and larger view
+        distances.
+      </p>
+
+      <p>&nbsp;</p>
+
+      <p><strong>No water in the Rivers mod's rivers?</strong></p>
+
+      <p>
+        Delete cache, remove your current rivers.json in the ModConfig folder.
+        Reopen a world to let it regenerate the rivers.json. It should work
+        after that.<br />You can then edit the values in the new rivers.json to
+        match your old one if you want, but don't readd configs that don't exist
+        in the new one.<br />Could also be that your heightBoost value is too
+        high.
+      </p>
+    </div>
+  </div>
+
+  <p style="margin: 0 0 8px"><strong>Credits:</strong></p>
+
+  <p style="margin: 0 0 8px">
+    - Animated mod card by <strong>juneisal </strong>--
+    https://ko-fi.com/juneisal
+  </p>
+
+  <p style="margin: 0 0 8px">
+    - Stream sound, "Medium River 1" by <strong>miguelpascucci</strong> --
+    https://freesound.org/s/350482/ -- License: Attribution 4.0
+  </p>
+
+  <p style="margin: 0 0 8px">
+    - Pulley sound, "14 - Polea.wav" by <strong>MichaelGillighan</strong> --
+    https://freesound.org/s/429215/ -- License: Creative Commons 0
+  </p>
+
+  <p style="margin: 0 0 8px">&nbsp;</p>
+
+  <p style="margin: 0 0 8px">
+    Hit me up if you want to help out or have any ideas about world generation
+    features. I can answer any questions about how anything works, especially if
+    you want to mod world gen yourself.
+  </p>
+
+  <p>
+    I could use info on how this mod performs on a server with 15+ players, or
+    about any potential broken world gen.<br />If there's anyone good with
+    shaders and wants to help, the water needs a big upgrade. In my opinion,
+    it's the biggest thing holding back the appearance of the streams.
+  </p>
+
+  <p>
+    <br /><strong>Contacts:</strong> Discord: algernon733 | Email:
+    <a href="denied:mailto:algernon733@gmail.com">algernon733@gmail.com</a>
+  </p>
+
+  <p>&nbsp;</p>
+
+  <p>
+    If you want to talk about Watersheds, landforms, world settings, or worldgen
+    in general, you can join our <strong>Discord</strong>:<br /><a
+      href="https://discord.gg/WZBgePPwvN"
+      target="_blank"
+      rel="noopener"
+      >https://discord.gg/WZBgePPwvN</a
+    >
+  </p>
+</div>

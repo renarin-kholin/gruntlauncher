@@ -3,8 +3,8 @@ use iced::{
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
-        button, column, container, image, right_center, row, rule, scrollable,
-        space, text, text_input,
+        button, column, container, image, right_center, row, rule, scrollable, space, text,
+        text_input,
     },
 };
 
@@ -12,6 +12,7 @@ use crate::{
     core::instance::GruntInstance,
     ui::{
         GruntAction, GruntState,
+        app::GruntMessage,
         views::ScreenOutput,
         widget::table::{self, TableColumn},
     },
@@ -75,6 +76,9 @@ pub enum Message {
     Next,
     Back,
     Cancel,
+
+    //WebView Messages
+    WebView(iced_webview::Action),
 }
 
 impl Default for Screen {
@@ -183,7 +187,11 @@ impl Screen {
         ]
         .into()
     }
-    fn view_mods(&self, _state: &GruntState) -> Element<'_, Message> {
+    fn view_mods<'a>(
+        &'a self,
+        _state: &GruntState,
+        webview: Option<Element<'a, Message>>,
+    ) -> Element<'a, Message> {
         use Message::*;
         //Main container
         column![
@@ -204,10 +212,12 @@ impl Screen {
                         .spacing(5.0)
                         .padding(padding::all(10.0)),
                     rule::horizontal(1.0),
-                    scrollable(
-                        //Mod info
-                        column![].padding(padding::all(10.0)),
-                    )
+                    //Mod info
+                    scrollable(if let Some(w) = webview {
+                        w
+                    } else {
+                        text!("Loading...").into()
+                    })
                     .height(Length::Fill),
                     rule::horizontal(1.0),
                     right_center(
@@ -237,7 +247,11 @@ impl Screen {
         ]
         .into()
     }
-    pub fn view(&self, state: &GruntState) -> Element<'_, Message> {
+    pub fn view<'a>(
+        &'a self,
+        state: &GruntState,
+        webview: Option<Element<'a, Message>>,
+    ) -> Element<'a, Message> {
         use Message::*;
         row![
             scrollable(
@@ -277,7 +291,7 @@ impl Screen {
             rule::vertical(1.0),
             match self.step {
                 Step::Basic => self.view_basic(state),
-                Step::Mod => self.view_mods(state),
+                Step::Mod => self.view_mods(state, webview),
                 Step::Review => space().into(),
             }
         ]
@@ -312,6 +326,7 @@ impl Screen {
                 self.selected_mod = Some(i);
                 ScreenOutput::none()
             }
+            _ => ScreenOutput::none(),
         }
     }
 }
