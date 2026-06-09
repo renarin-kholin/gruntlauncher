@@ -95,6 +95,8 @@ impl Screen {
                 .padding(padding::all(10.0))
             ]
         ]
+        .height(Length::Fill)
+        .width(Length::Fill)
         .into()
     }
     pub fn update(&mut self, message: Message) -> ScreenOutput<Message> {

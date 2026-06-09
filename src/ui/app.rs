@@ -1,6 +1,6 @@
 use iced::{
-    Element, Size, Task,
-    widget::space,
+    Element, Length, Size, Task, alignment, padding,
+    widget::{column, container, opaque, space, stack},
     window::{Icon, icon, settings::PlatformSpecific},
 };
 
@@ -27,33 +27,64 @@ pub enum GruntAction {
 }
 
 pub struct GruntLauncher {
-    screen: Screen,
+    overlay: Option<Screen>,
+    home: home::Screen,
     state: GruntState,
 }
 
 impl GruntLauncher {
     pub fn new() -> Self {
         Self {
-            screen: Screen::Home(home::Screen::new()),
+            overlay: None,
+            home: home::Screen::new(),
             state: GruntState::default(),
         }
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
         use GruntMessage::*;
-        match &self.screen {
-            Screen::Home(s) => s.view(&self.state).map(HomeMessage),
-            Screen::AddInstance(s) => s.view(&self.state).map(AddInstanceMessage),
+        let base = self.home.view(&self.state).map(HomeMessage);
+        match &self.overlay {
+            None => base,
+            Some(overlay) => {
+                let panel = match overlay {
+                    Screen::AddInstance(s) => s.view(&self.state).map(AddInstanceMessage),
+                };
+                stack![
+                    base,
+                    opaque(
+                        container(
+                            container(panel)
+                                .width(Length::Fill)
+                                .height(Length::Fill)
+                                .style(container::bordered_box)
+                        )
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .padding(padding::all(40.0))
+                        .style(|_theme| container::Style {
+                            background: Some(iced::Background::Color(iced::Color {
+                                a: 0.8,
+                                ..iced::Color::BLACK
+                            })),
+                            ..Default::default()
+                        })
+                        .align_x(alignment::Horizontal::Center)
+                        .align_y(alignment::Vertical::Center)
+                    )
+                ]
+                .into()
+            }
         }
     }
     pub fn update(&mut self, message: GruntMessage) -> Task<GruntMessage> {
         use GruntMessage::*;
         match message {
-            HomeMessage(m) if let Screen::Home(s) = &mut self.screen => {
-                let out = s.update(m);
+            HomeMessage(m) => {
+                let out = self.home.update(m);
                 self.handle_actions(out.actions)
                     .chain(out.task.map(HomeMessage))
             }
-            AddInstanceMessage(m) if let Screen::AddInstance(s) = &mut self.screen => {
+            AddInstanceMessage(m) if let Some(Screen::AddInstance(s)) = &mut self.overlay => {
                 let out = s.update(m);
                 self.handle_actions(out.actions)
                     .chain(out.task.map(AddInstanceMessage))
@@ -65,10 +96,10 @@ impl GruntLauncher {
         use GruntAction::*;
         match action {
             SwitchScreen(s) => {
-                self.screen = s;
+                self.overlay = Some(s);
             }
             CloseScreen => {
-                self.screen = Screen::Home(home::Screen::new());
+                self.overlay = None;
             }
         }
         Task::none()

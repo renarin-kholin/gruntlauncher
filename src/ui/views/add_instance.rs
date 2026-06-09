@@ -129,6 +129,8 @@ impl Screen {
             .height(Length::Fill)
             .width(Length::Fill)
         ]
+        .height(Length::Fill)
+        .width(Length::Fill)
         .into()
     }
 

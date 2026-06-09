@@ -6,7 +6,6 @@ pub mod home;
 //The current actively shown Screen
 #[derive(Clone)]
 pub enum Screen {
-    Home(home::Screen),
     AddInstance(add_instance::Screen),
 }
 
