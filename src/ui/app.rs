@@ -2,13 +2,14 @@ use std::{fs::read_to_string, time::Duration};
 
 use iced::{
     Element, Length, Size, Subscription, Task, alignment, padding, time,
-    widget::{container, opaque, space, stack, text},
+    widget::{container, opaque, stack},
     window::{icon, settings::PlatformSpecific},
 };
 use iced_webview::{PageType, WebView};
 
 use crate::{
     assets::GRUNT_ICON,
+    core::instance::GruntInstance,
     ui::{
         GruntState,
         theme::grunt_theme,
@@ -31,6 +32,7 @@ pub enum GruntMessage {
 pub enum GruntAction {
     SwitchScreen(Screen),
     CloseScreen,
+    CreateInstance(GruntInstance),
 }
 
 type Engine = iced_webview::Blitz;
@@ -152,6 +154,10 @@ impl GruntLauncher {
             }
             CloseScreen => {
                 self.overlay = None;
+            }
+            CreateInstance(instance) => {
+                //TODO: call the instance creation logic on dommain and reload state
+                self.state.instances.push(instance);
             }
         }
         Task::none()

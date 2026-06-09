@@ -91,13 +91,14 @@ impl Screen {
                     .wrap()
                 )
                 .width(Length::FillPortion(5)),
+                rule::vertical(1.0),
                 //Sidebar
                 column![
                     text("Selected instance"),
                     button("Launch").padding(padding::horizontal(30.0).vertical(7.0))
                 ]
                 .align_x(Horizontal::Center)
-                .width(Length::FillPortion(2))
+                .width(Length::FillPortion(1))
                 .spacing(10.0)
                 .padding(padding::all(10.0))
             ]

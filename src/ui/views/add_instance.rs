@@ -3,7 +3,7 @@ use iced::{
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
-        button, column, container, image, right_center, row, rule, scrollable, space, text,
+        button, column, container, image, right_center, row, rule, scrollable, text,
         text_input,
     },
 };
@@ -12,7 +12,6 @@ use crate::{
     core::instance::GruntInstance,
     ui::{
         GruntAction, GruntState,
-        app::GruntMessage,
         views::ScreenOutput,
         widget::table::{self, TableColumn},
     },
@@ -76,6 +75,7 @@ pub enum Message {
     Next,
     Back,
     Cancel,
+    CreateInstance,
 
     //WebView Messages
     WebView(iced_webview::Action),
@@ -212,7 +212,9 @@ impl Screen {
             right_center(
                 row![
                     button("Back").on_press(Back).style(button::secondary),
-                    button("Next").on_press(Next).style(button::success),
+                    button("Finish")
+                        .on_press(CreateInstance)
+                        .style(button::success),
                     button("Cancel").on_press(Cancel).style(button::danger)
                 ]
                 .height(Length::Shrink)
@@ -392,6 +394,10 @@ impl Screen {
             SelectMod(i) => {
                 self.selected_mod = Some(i);
                 ScreenOutput::none()
+            }
+            Message::CreateInstance => {
+                ScreenOutput::action(GruntAction::CreateInstance(self.instance.clone()))
+                    .action_add(CloseScreen)
             }
             _ => ScreenOutput::none(),
         }
