@@ -1,12 +1,11 @@
 use iced::{
     Element, Length, Size, Task, alignment, padding,
-    widget::{column, container, opaque, space, stack},
-    window::{Icon, icon, settings::PlatformSpecific},
+    widget::{container, opaque, stack},
+    window::{icon, settings::PlatformSpecific},
 };
 
 use crate::{
     assets::GRUNT_ICON,
-    core::instance::GruntInstance,
     ui::{
         GruntState,
         theme::grunt_theme,
@@ -30,6 +29,12 @@ pub struct GruntLauncher {
     overlay: Option<Screen>,
     home: home::Screen,
     state: GruntState,
+}
+
+impl Default for GruntLauncher {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GruntLauncher {
@@ -78,13 +83,14 @@ impl GruntLauncher {
     }
     pub fn update(&mut self, message: GruntMessage) -> Task<GruntMessage> {
         use GruntMessage::*;
+        use Screen::*;
         match message {
             HomeMessage(m) => {
                 let out = self.home.update(m);
                 self.handle_actions(out.actions)
                     .chain(out.task.map(HomeMessage))
             }
-            AddInstanceMessage(m) if let Some(Screen::AddInstance(s)) = &mut self.overlay => {
+            AddInstanceMessage(m) if let Some(AddInstance(s)) = &mut self.overlay => {
                 let out = s.update(m);
                 self.handle_actions(out.actions)
                     .chain(out.task.map(AddInstanceMessage))

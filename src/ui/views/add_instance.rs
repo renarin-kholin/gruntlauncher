@@ -1,8 +1,11 @@
 use iced::{
-    Element, Length, Padding,
+    Element, Length,
     alignment::{Horizontal, Vertical},
     padding,
-    widget::{button, column, container, image, row, rule, scrollable, space, text, text_input},
+    widget::{
+        button, column, container, image, right_center, row, rule, scrollable,
+        space, text, text_input,
+    },
 };
 
 use crate::{
@@ -33,17 +36,51 @@ impl Version {
         }
     }
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Step {
+    Basic,
+    Mod,
+    Review,
+}
+impl Step {
+    pub fn next(&mut self) {
+        match self {
+            Self::Basic => *self = Self::Mod,
+            Self::Mod => *self = Self::Review,
+            Self::Review => *self = Self::Basic,
+        }
+    }
+    pub fn back(&mut self) {
+        match self {
+            Self::Basic => *self = Self::Review,
+            Self::Mod => *self = Self::Basic,
+            Self::Review => *self = Self::Mod,
+        }
+    }
+}
 #[derive(Clone)]
 pub struct Screen {
     instance: GruntInstance,
     columns: Vec<TableColumn>,
     rows: Vec<Vec<String>>,
+    step: Step,
+    selected_mod: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     NameChanged(String),
+    SelectMod(usize),
+    Navigate(Step),
+    Next,
+    Back,
     Cancel,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Screen {
@@ -69,65 +106,180 @@ impl Screen {
                 .iter()
                 .map(|v| vec![v.name.clone(), v.version_type()])
                 .collect(),
+            step: Step::Basic,
+            selected_mod: None,
         }
     }
 
-    pub fn view(&self, _state: &GruntState) -> Element<'_, Message> {
+    fn view_basic(&self, _state: &GruntState) -> Element<'_, Message> {
+        use Message::*;
         column![
             //Instance details (name and icon)
             row![
                 button(image("assets/icons/logo.png").height(50.0).width(50.0)).style(button::text),
-                row![
-                    text!("Name: "),
-                    text_input("Default name", &self.instance.name).on_input(Message::NameChanged)
+                column![
+                    text!("Instance Name "),
+                    text_input("Default name", &self.instance.name).on_input(NameChanged)
                 ]
-                .align_y(Vertical::Center)
-                .spacing(4.0)
+                .spacing(5.0)
             ]
             .align_y(Vertical::Center)
             .spacing(10.0)
             .padding(padding::all(10.0))
             .height(Length::Shrink),
             rule::horizontal(1.0),
-            row![
-                scrollable(column![
-                    button("Basics").width(Length::Fill).style(button::text),
-                    button("Mods").width(Length::Fill).style(button::text),
-                    button("Review").width(Length::Fill).style(button::text)
-                ])
-                .width(Length::Fixed(150.0)),
-                rule::vertical(1.0),
-                column![
-                    scrollable(
-                        container(table::Table::new(&self.columns, &self.rows).row_height(30.0))
-                            .width(Length::Fill)
-                            .height(Length::Fill)
-                            .padding(padding::all(1.0))
-                            .style(container::bordered_box)
-                    )
-                    .height(Length::Fill)
+            scrollable(
+                container(table::Table::new(&self.columns, &self.rows).row_height(30.0))
                     .width(Length::Fill)
-                    .style(|theme, status| {
-                        scrollable::Style {
-                            container: container::bordered_box(theme),
-                            ..scrollable::default(theme, status)
-                        }
-                    }),
-                    row![
-                        button("Next"),
-                        button("Cancel")
-                            .on_press(Message::Cancel)
-                            .style(button::subtle)
-                    ]
-                    .spacing(10.0)
-                    .align_y(Vertical::Center)
-                ]
-                .spacing(10.0)
-                .padding(padding::all(10.0))
-                .align_x(Horizontal::Right)
-            ]
+                    .height(Length::Fill)
+                    .padding(padding::all(1.0))
+                    .style(container::bordered_box)
+            )
             .height(Length::Fill)
             .width(Length::Fill)
+            .style(|theme, status| {
+                scrollable::Style {
+                    container: container::bordered_box(theme),
+                    ..scrollable::default(theme, status)
+                }
+            }),
+            row![
+                button("Next").on_press(Next).style(button::success),
+                button("Cancel").on_press(Cancel).style(button::danger)
+            ]
+            .spacing(10.0)
+            .align_y(Vertical::Center)
+        ]
+        .spacing(10.0)
+        .padding(padding::all(10.0))
+        .align_x(Horizontal::Right)
+        .into()
+    }
+    fn mod_item(&self, i: usize) -> Element<'_, Message> {
+        use Message::*;
+        column![
+            button(
+                row![
+                    container(image("assets/icons/logo.png").height(50.0).width(50.0))
+                        .style(container::bordered_box),
+                    column![text!("Mod name"), text!("Mod Version")].spacing(5.0)
+                ]
+                .padding(10.0)
+                .spacing(10.0),
+            )
+            .on_press(SelectMod(i))
+            .style(move |theme, mut status| {
+                if let Some(s) = self.selected_mod
+                    && s == i
+                {
+                    status = button::Status::Pressed
+                };
+                button::Style {
+                    ..button::subtle(theme, status)
+                }
+            })
+            .width(Length::Fill),
+            rule::horizontal(1.0)
+        ]
+        .into()
+    }
+    fn view_mods(&self, _state: &GruntState) -> Element<'_, Message> {
+        use Message::*;
+        //Main container
+        column![
+            row![
+                //Search mods
+                column![
+                    column![text!("Search"), text_input("Search for mods", "")]
+                        .padding(padding::all(10.0))
+                        .spacing(5.0),
+                    rule::horizontal(1.0),
+                    scrollable(column((0..100).map(|i| self.mod_item(i))))
+                ]
+                .width(Length::FillPortion(2)),
+                rule::vertical(1.0),
+                //View mods info and select
+                column![
+                    column!(text!("Mod Name"))
+                        .spacing(5.0)
+                        .padding(padding::all(10.0)),
+                    rule::horizontal(1.0),
+                    scrollable(
+                        //Mod info
+                        column![].padding(padding::all(10.0)),
+                    )
+                    .height(Length::Fill),
+                    rule::horizontal(1.0),
+                    right_center(
+                        row![text!("Version dropdown"), button("Add")]
+                            .spacing(10.0)
+                            .padding(padding::all(10.0))
+                            .align_y(Vertical::Center)
+                    )
+                    .height(Length::Shrink)
+                ]
+                .width(Length::FillPortion(3))
+            ],
+            rule::horizontal(1.0),
+            right_center(
+                row![
+                    button("Back").on_press(Back).style(button::secondary),
+                    button("Next").on_press(Next).style(button::success),
+                    button("Cancel").on_press(Cancel).style(button::danger)
+                ]
+                .height(Length::Shrink)
+                .width(Length::Shrink)
+                .align_y(Vertical::Center)
+                .spacing(10.0)
+                .padding(padding::all(10.0))
+            )
+            .height(Length::Shrink)
+        ]
+        .into()
+    }
+    pub fn view(&self, state: &GruntState) -> Element<'_, Message> {
+        use Message::*;
+        row![
+            scrollable(
+                column![
+                    button("1. Basics")
+                        .on_press(Navigate(Step::Basic))
+                        .width(Length::Fill)
+                        .style(|theme, mut status| {
+                            if self.step == Step::Basic {
+                                status = button::Status::Pressed
+                            };
+                            button::subtle(theme, status)
+                        }),
+                    button("2. Mods")
+                        .on_press(Navigate(Step::Mod))
+                        .width(Length::Fill)
+                        .style(|theme, mut status| {
+                            if self.step == Step::Mod {
+                                status = button::Status::Pressed
+                            };
+                            button::subtle(theme, status)
+                        }),
+                    button("3. Review")
+                        .on_press(Navigate(Step::Review))
+                        .width(Length::Fill)
+                        .style(|theme, mut status| {
+                            if self.step == Step::Review {
+                                status = button::Status::Pressed
+                            };
+                            button::subtle(theme, status)
+                        }),
+                ]
+                .padding(padding::all(10.0))
+                .spacing(10.0)
+            )
+            .width(Length::Fixed(150.0)),
+            rule::vertical(1.0),
+            match self.step {
+                Step::Basic => self.view_basic(state),
+                Step::Mod => self.view_mods(state),
+                Step::Review => space().into(),
+            }
         ]
         .height(Length::Fill)
         .width(Length::Fill)
@@ -136,10 +288,28 @@ impl Screen {
 
     pub fn update(&mut self, message: Message) -> ScreenOutput<Message> {
         use GruntAction::*;
+        use Message::*;
+
         match message {
-            Message::Cancel => ScreenOutput::action(CloseScreen),
-            Message::NameChanged(name) => {
+            Cancel => ScreenOutput::action(CloseScreen),
+            NameChanged(name) => {
                 self.instance.name = name;
+                ScreenOutput::none()
+            }
+            Navigate(step) => {
+                self.step = step;
+                ScreenOutput::none()
+            }
+            Next => {
+                self.step.next();
+                ScreenOutput::none()
+            }
+            Back => {
+                self.step.back();
+                ScreenOutput::none()
+            }
+            SelectMod(i) => {
+                self.selected_mod = Some(i);
                 ScreenOutput::none()
             }
         }

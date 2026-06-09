@@ -2,7 +2,7 @@ use iced::{
     Element, Length,
     alignment::{Horizontal, Vertical},
     padding,
-    widget::{button, column, image, row, rule, scrollable, space, text},
+    widget::{button, column, image, row, rule, scrollable, text},
 };
 
 use crate::{
@@ -24,6 +24,12 @@ type InstanceId = usize;
 pub enum Message {
     SelectInstance(InstanceId),
     AddInstance,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Screen {
@@ -83,14 +89,15 @@ impl Screen {
                     .padding(padding::all(10.0))
                     .width(Length::Fill)
                     .wrap()
-                ),
+                )
+                .width(Length::FillPortion(5)),
                 //Sidebar
                 column![
                     text("Selected instance"),
                     button("Launch").padding(padding::horizontal(30.0).vertical(7.0))
                 ]
                 .align_x(Horizontal::Center)
-                .width(Length::Shrink)
+                .width(Length::FillPortion(2))
                 .spacing(10.0)
                 .padding(padding::all(10.0))
             ]

@@ -1,5 +1,3 @@
-use iced::Border;
-use iced::Color;
 use iced::Element;
 use iced::Event;
 use iced::Length;
@@ -16,7 +14,6 @@ use iced::advanced::widget::Tree;
 use iced::advanced::widget::tree;
 use iced::alignment::Horizontal;
 use iced::alignment::Vertical;
-use iced::border::Radius;
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableColumn {
     pub header: String,
@@ -131,10 +128,10 @@ where
         tree: &iced::advanced::widget::Tree,
         renderer: &mut Renderer,
         theme: &iced::Theme,
-        style: &renderer::Style,
+        _style: &renderer::Style,
         layout: iced::advanced::Layout<'_>,
-        cursor: iced::advanced::mouse::Cursor,
-        viewport: &iced::Rectangle,
+        _cursor: iced::advanced::mouse::Cursor,
+        _viewport: &iced::Rectangle,
     ) {
         let state = tree.state.downcast_ref::<TableState>();
         let bounds = layout.bounds();
