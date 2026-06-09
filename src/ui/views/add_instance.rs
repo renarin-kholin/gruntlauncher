@@ -159,6 +159,73 @@ impl Screen {
         .align_x(Horizontal::Right)
         .into()
     }
+    fn review_mod_item(&self, i: usize) -> Element<'_, Message> {
+        use Message::*;
+        column![
+            button(
+                row![
+                    container(image("assets/icons/logo.png").height(50.0).width(50.0))
+                        .style(container::bordered_box),
+                    column![text!("Mod name"), text!("Mod Version")].spacing(5.0),
+                    right_center(
+                        row![button("Delete")]
+                            .spacing(5.0)
+                            .align_y(Vertical::Center)
+                    )
+                ]
+                .padding(10.0)
+                .spacing(10.0),
+            )
+            .on_press(SelectMod(i))
+            .style(button::subtle)
+            .width(Length::Fill),
+            rule::horizontal(1.0)
+        ]
+        .into()
+    }
+    fn view_review(&self) -> Element<'_, Message> {
+        use Message::*;
+
+        column![
+            //Instance details (name and icon)
+            row![
+                button(image("assets/icons/logo.png").height(50.0).width(50.0)).style(button::text),
+                column![
+                    text!("Instance Name "),
+                    text!("{}", &self.instance.name),
+                    text!("1.20.2")
+                ]
+                .spacing(5.0)
+            ]
+            .align_y(Vertical::Center)
+            .spacing(10.0)
+            .padding(padding::all(10.0))
+            .height(Length::Shrink),
+            rule::horizontal(1.0),
+            container(text!("The following mods will be installed"))
+                .padding(padding::vertical(5.0).horizontal(10.0)),
+            rule::horizontal(1.0),
+            scrollable(column((0..100).map(|i| self.review_mod_item(i))))
+                .height(Length::Fill)
+                .width(Length::Fill),
+            rule::horizontal(1.0),
+            right_center(
+                row![
+                    button("Back").on_press(Back).style(button::secondary),
+                    button("Next").on_press(Next).style(button::success),
+                    button("Cancel").on_press(Cancel).style(button::danger)
+                ]
+                .height(Length::Shrink)
+                .width(Length::Shrink)
+                .align_y(Vertical::Center)
+                .spacing(10.0)
+                .padding(padding::all(10.0))
+            )
+            .height(Length::Shrink)
+        ]
+        .spacing(10.0)
+        .into()
+    }
     fn mod_item(&self, i: usize) -> Element<'_, Message> {
         use Message::*;
         column![
@@ -292,7 +359,7 @@ impl Screen {
             match self.step {
                 Step::Basic => self.view_basic(state),
                 Step::Mod => self.view_mods(state, webview),
-                Step::Review => space().into(),
+                Step::Review => self.view_review(),
             }
         ]
         .height(Length::Fill)
