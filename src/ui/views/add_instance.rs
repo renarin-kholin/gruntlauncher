@@ -74,6 +74,7 @@ pub enum Message {
     NameChanged(String),
     SelectMod(usize),
     Navigate(Step),
+    OpenInBrowser(String),
     Next,
     Back,
     Cancel,
@@ -283,9 +284,15 @@ impl Screen {
                     scrollable(web_view(&state.webview_content)).height(Length::Fill),
                     rule::horizontal(1.0),
                     row![
-                        row![button("Open in default browser").style(button::text)]
-                            .align_y(Vertical::Center)
-                            .padding(10.0),
+                        row![
+                            button("Open in default browser")
+                                .style(button::text)
+                                .on_press(OpenInBrowser(
+                                    "https://mods.vintagestory.at/algernonswatersheds".to_string()
+                                ))
+                        ]
+                        .align_y(Vertical::Center)
+                        .padding(10.0),
                         right_center(
                             row![text!("Version dropdown"), button("Add")]
                                 .spacing(10.0)
@@ -414,6 +421,10 @@ impl Screen {
             }
             ModViewPageFetched(Ok(page)) => {
                 state.webview_content.load_html(&page);
+                ScreenOutput::none()
+            }
+            OpenInBrowser(url) => {
+                let _ = webbrowser::open(&url);
                 ScreenOutput::none()
             }
             _ => ScreenOutput::none(),
