@@ -1,10 +1,11 @@
+use std::fs::read_to_string;
+
 use iced::{
     Element, Length,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
-        button, column, container, image, right_center, row, rule, scrollable, text,
-        text_input,
+        button, column, container, image, right_center, row, rule, scrollable, text, text_input,
     },
 };
 
@@ -289,12 +290,18 @@ impl Screen {
                     })
                     .height(Length::Fill),
                     rule::horizontal(1.0),
-                    right_center(
-                        row![text!("Version dropdown"), button("Add")]
-                            .spacing(10.0)
-                            .padding(padding::all(10.0))
+                    row![
+                        row![button("Open in default browser").style(button::text)]
                             .align_y(Vertical::Center)
-                    )
+                            .padding(10.0),
+                        right_center(
+                            row![text!("Version dropdown"), button("Add")]
+                                .spacing(10.0)
+                                .padding(padding::all(10.0))
+                                .align_y(Vertical::Center)
+                        )
+                        .height(Length::Shrink)
+                    ]
                     .height(Length::Shrink)
                 ]
                 .width(Length::FillPortion(3))
@@ -393,7 +400,10 @@ impl Screen {
             }
             SelectMod(i) => {
                 self.selected_mod = Some(i);
-                ScreenOutput::none()
+                ScreenOutput::action(WebViewNavigate(iced_webview::PageType::Html(
+                    read_to_string("src/ui/test.html")
+                        .unwrap_or("<p>Page Could not be loaded</p>".to_string()),
+                )))
             }
             Message::CreateInstance => {
                 ScreenOutput::action(GruntAction::CreateInstance(self.instance.clone()))

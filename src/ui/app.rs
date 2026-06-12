@@ -1,8 +1,10 @@
 use std::{fs::read_to_string, time::Duration};
 
 use iced::{
-    Element, Length, Size, Subscription, Task, alignment, padding, time,
-    widget::{container, opaque, stack},
+    Border, Element, Length, Size, Subscription, Task, Theme, alignment,
+    border::Radius,
+    padding, time,
+    widget::{column, container, opaque, rule, stack, text},
     window::{icon, settings::PlatformSpecific},
 };
 use iced_webview::{PageType, WebView};
@@ -33,6 +35,7 @@ pub enum GruntAction {
     SwitchScreen(Screen),
     CloseScreen,
     CreateInstance(GruntInstance),
+    WebViewNavigate(iced_webview::PageType),
 }
 
 type Engine = iced_webview::Blitz;
@@ -45,24 +48,18 @@ pub struct GruntLauncher {
 }
 
 impl GruntLauncher {
-    pub fn new() -> (Self, Task<GruntMessage>) {
+    pub fn new() -> Self {
         let webview = WebView::new()
             .on_create_view(GruntMessage::WebViewCreated)
             .on_action(GruntMessage::WebView);
-        (
-            Self {
-                overlay: None,
-                home: home::Screen::new(),
-                state: GruntState::default(),
-                webview: Some(webview),
-                webview_ready: false,
-            },
-            Task::done(GruntMessage::WebView(iced_webview::Action::CreateView(
-                PageType::Html(
-                    read_to_string("src/ui/test.html").expect("Could not read htmlfile"),
-                ),
-            ))),
-        )
+
+        Self {
+            overlay: None,
+            home: home::Screen::new(),
+            state: GruntState::default(),
+            webview: Some(webview),
+            webview_ready: false,
+        }
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
         use GruntMessage::*;
@@ -84,14 +81,34 @@ impl GruntLauncher {
                         )
                         .map(AddInstanceMessage),
                 };
+
                 stack![
                     base,
                     opaque(
                         container(
-                            container(panel)
-                                .width(Length::Fill)
-                                .height(Length::Fill)
-                                .style(container::bordered_box)
+                            container(column![
+                                container(text!("{}", overlay.title()).color(
+                                    grunt_theme().extended_palette().secondary.strong.color
+                                ))
+                                .padding(padding::vertical(5.0).horizontal(15.0))
+                                .height(Length::Shrink)
+                                .style(|theme: &Theme| container::Style {
+                                    background: Some(
+                                        theme.extended_palette().background.weaker.color.into()
+                                    ),
+                                    border: Border {
+                                        radius: Radius::default().bottom(0.0).top(4.0),
+                                        color: theme.extended_palette().background.weak.color,
+                                        width: 1.0,
+                                    },
+                                    ..container::rounded_box(theme)
+                                })
+                                .width(Length::Fill),
+                                panel
+                            ])
+                            .width(Length::Fill)
+                            .height(Length::Fill)
+                            .style(container::bordered_box)
                         )
                         .width(Length::Fill)
                         .height(Length::Fill)
@@ -128,7 +145,7 @@ impl GruntLauncher {
                     wvtask = w.update(a.clone());
                 }
                 let out = s.update(m);
-                Task::batch(vec![
+                Task::batch([
                     wvtask,
                     self.handle_actions(out.actions),
                     out.task.map(AddInstanceMessage),
@@ -148,6 +165,7 @@ impl GruntLauncher {
     }
     fn handle_action(&mut self, action: GruntAction) -> Task<GruntMessage> {
         use GruntAction::*;
+        use GruntMessage::*;
         match action {
             SwitchScreen(s) => {
                 self.overlay = Some(s);
@@ -159,16 +177,24 @@ impl GruntLauncher {
                 //TODO: call the instance creation logic on dommain and reload state
                 self.state.instances.push(instance);
             }
+
+            WebViewNavigate(page) => {
+                if let Some(w) = &mut self.webview {
+                    return w
+                        .update(iced_webview::Action::CloseCurrentView)
+                        .chain(w.update(iced_webview::Action::CreateView(page)));
+                }
+            }
         }
         Task::none()
     }
     fn handle_actions(&mut self, actions: Vec<GruntAction>) -> Task<GruntMessage> {
-        let tasks = actions
-            .iter()
-            .map(move |a| self.handle_action(a.clone()))
-            .collect::<Vec<_>>();
-
-        Task::batch(tasks)
+        Task::batch(
+            actions
+                .into_iter()
+                .map(|a| self.handle_action(a))
+                .collect::<Vec<_>>(),
+        )
     }
     fn subscription(&self) -> Subscription<GruntMessage> {
         time::every(Duration::from_millis(10))

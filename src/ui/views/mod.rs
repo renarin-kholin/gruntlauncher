@@ -9,6 +9,14 @@ pub enum Screen {
     AddInstance(add_instance::Screen),
 }
 
+impl Screen {
+    pub fn title(&self) -> String {
+        match self {
+            Screen::AddInstance(_) => "Add a new Instance".to_string(),
+        }
+    }
+}
+
 pub struct ScreenOutput<MessageT> {
     pub task: Task<MessageT>,
     pub actions: Vec<GruntAction>,
