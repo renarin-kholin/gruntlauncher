@@ -7,7 +7,6 @@ use iced::{
     widget::{column, container, opaque, rule, stack, text},
     window::{icon, settings::PlatformSpecific},
 };
-use iced_webview::{PageType, WebView};
 
 use crate::{
     assets::GRUNT_ICON,
@@ -18,16 +17,11 @@ use crate::{
         views::{Screen, add_instance, home},
     },
 };
-
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
 #[derive(Debug, Clone)]
 pub enum GruntMessage {
     HomeMessage(home::Message),
     AddInstanceMessage(add_instance::Message),
-
-    //WebView Events
-    WebViewCreated,
-    WebView(iced_webview::Action),
 }
 
 #[derive(Clone)]
@@ -35,30 +29,20 @@ pub enum GruntAction {
     SwitchScreen(Screen),
     CloseScreen,
     CreateInstance(GruntInstance),
-    WebViewNavigate(iced_webview::PageType),
 }
 
-type Engine = iced_webview::Blitz;
 pub struct GruntLauncher {
     overlay: Option<Screen>,
     home: home::Screen,
     state: GruntState,
-    webview: Option<WebView<Engine, GruntMessage>>,
-    webview_ready: bool,
 }
 
 impl GruntLauncher {
     pub fn new() -> Self {
-        let webview = WebView::new()
-            .on_create_view(GruntMessage::WebViewCreated)
-            .on_action(GruntMessage::WebView);
-
         Self {
             overlay: None,
             home: home::Screen::new(),
             state: GruntState::default(),
-            webview: Some(webview),
-            webview_ready: false,
         }
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
@@ -68,18 +52,7 @@ impl GruntLauncher {
             None => base,
             Some(overlay) => {
                 let panel = match overlay {
-                    Screen::AddInstance(s) => s
-                        .view(
-                            &self.state,
-                            if self.webview_ready {
-                                self.webview.as_ref().map(|webview| {
-                                    webview.view().map(add_instance::Message::WebView)
-                                })
-                            } else {
-                                None
-                            },
-                        )
-                        .map(AddInstanceMessage),
+                    Screen::AddInstance(s) => s.view(&self.state).map(AddInstanceMessage),
                 };
 
                 stack![
@@ -138,28 +111,12 @@ impl GruntLauncher {
                     .chain(out.task.map(HomeMessage))
             }
             AddInstanceMessage(m) if let Some(AddInstance(s)) = &mut self.overlay => {
-                let mut wvtask = Task::none();
-                if let add_instance::Message::WebView(a) = &m
-                    && let Some(w) = &mut self.webview
-                {
-                    wvtask = w.update(a.clone());
-                }
-                let out = s.update(m);
+                let out = s.update(m, &mut self.state);
                 Task::batch([
-                    wvtask,
                     self.handle_actions(out.actions),
                     out.task.map(AddInstanceMessage),
                 ])
             }
-            WebViewCreated => {
-                self.webview_ready = true;
-                if let Some(webview) = &mut self.webview {
-                    webview.update(iced_webview::Action::ChangeView(0))
-                } else {
-                    Task::none()
-                }
-            }
-            WebView(action) if let Some(webview) = &mut self.webview => webview.update(action),
             _ => Task::none(),
         }
     }
@@ -177,14 +134,6 @@ impl GruntLauncher {
                 //TODO: call the instance creation logic on dommain and reload state
                 self.state.instances.push(instance);
             }
-
-            WebViewNavigate(page) => {
-                if let Some(w) = &mut self.webview {
-                    return w
-                        .update(iced_webview::Action::CloseCurrentView)
-                        .chain(w.update(iced_webview::Action::CreateView(page)));
-                }
-            }
         }
         Task::none()
     }
@@ -195,11 +144,6 @@ impl GruntLauncher {
                 .map(|a| self.handle_action(a))
                 .collect::<Vec<_>>(),
         )
-    }
-    fn subscription(&self) -> Subscription<GruntMessage> {
-        time::every(Duration::from_millis(10))
-            .map(|_| iced_webview::Action::Update)
-            .map(GruntMessage::WebView)
     }
 }
 
@@ -229,7 +173,6 @@ pub fn run() -> iced::Result {
         GruntLauncher::update,
         GruntLauncher::view,
     )
-    .subscription(GruntLauncher::subscription)
     .settings(settings())
     .window(window_settings())
     .theme(grunt_theme())

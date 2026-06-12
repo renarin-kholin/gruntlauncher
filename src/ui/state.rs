@@ -1,7 +1,10 @@
+use iced_blitzview::Content;
+
 use crate::core::instance::GruntInstance;
 
 pub struct GruntState {
     pub instances: Vec<GruntInstance>,
+    pub webview_content: Content,
 }
 //Temporary initializer with mock data
 impl Default for GruntState {
@@ -13,6 +16,7 @@ impl Default for GruntState {
                 };
                 20
             ],
+            webview_content: Content::new(),
         }
     }
 }

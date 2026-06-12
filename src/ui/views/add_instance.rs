@@ -1,13 +1,14 @@
 use std::fs::read_to_string;
 
 use iced::{
-    Element, Length,
+    Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
         button, column, container, image, right_center, row, rule, scrollable, text, text_input,
     },
 };
+use iced_blitzview::{Content, fetch, fetch_html, web_view};
 
 use crate::{
     core::instance::GruntInstance,
@@ -78,8 +79,8 @@ pub enum Message {
     Cancel,
     CreateInstance,
 
-    //WebView Messages
-    WebView(iced_webview::Action),
+    //Webview events
+    ModViewPageFetched(Result<String, String>),
 }
 
 impl Default for Screen {
@@ -257,11 +258,7 @@ impl Screen {
         ]
         .into()
     }
-    fn view_mods<'a>(
-        &'a self,
-        _state: &GruntState,
-        webview: Option<Element<'a, Message>>,
-    ) -> Element<'a, Message> {
+    fn view_mods<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         //Main container
         column![
@@ -283,12 +280,7 @@ impl Screen {
                         .padding(padding::all(10.0)),
                     rule::horizontal(1.0),
                     //Mod info
-                    scrollable(if let Some(w) = webview {
-                        w
-                    } else {
-                        text!("Loading...").into()
-                    })
-                    .height(Length::Fill),
+                    scrollable(web_view(&state.webview_content)).height(Length::Fill),
                     rule::horizontal(1.0),
                     row![
                         row![button("Open in default browser").style(button::text)]
@@ -323,11 +315,7 @@ impl Screen {
         ]
         .into()
     }
-    pub fn view<'a>(
-        &'a self,
-        state: &GruntState,
-        webview: Option<Element<'a, Message>>,
-    ) -> Element<'a, Message> {
+    pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         row![
             scrollable(
@@ -367,7 +355,7 @@ impl Screen {
             rule::vertical(1.0),
             match self.step {
                 Step::Basic => self.view_basic(state),
-                Step::Mod => self.view_mods(state, webview),
+                Step::Mod => self.view_mods(state),
                 Step::Review => self.view_review(),
             }
         ]
@@ -375,8 +363,24 @@ impl Screen {
         .width(Length::Fill)
         .into()
     }
-
-    pub fn update(&mut self, message: Message) -> ScreenOutput<Message> {
+    fn fetch_mod(url: String) -> Task<Message> {
+        iced::Task::future(async move {
+            let client = reqwest::Client::new();
+            let response: serde_json::Value = client
+                .get(url)
+                .header("Accept", "application/json")
+                .send()
+                .await
+                .unwrap()
+                .json()
+                .await
+                .unwrap();
+            tracing::debug!("{:?}", response);
+            let html = response["mod"]["text"].as_str().unwrap();
+            Message::ModViewPageFetched(Ok(html.to_string()))
+        })
+    }
+    pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
         use Message::*;
 
@@ -400,14 +404,17 @@ impl Screen {
             }
             SelectMod(i) => {
                 self.selected_mod = Some(i);
-                ScreenOutput::action(WebViewNavigate(iced_webview::PageType::Html(
-                    read_to_string("src/ui/test.html")
-                        .unwrap_or("<p>Page Could not be loaded</p>".to_string()),
-                )))
+                ScreenOutput::task(Self::fetch_mod(
+                    "https://mods.vintagestory.at/api/mod/7286".to_string(),
+                ))
             }
             Message::CreateInstance => {
                 ScreenOutput::action(GruntAction::CreateInstance(self.instance.clone()))
                     .action_add(CloseScreen)
+            }
+            ModViewPageFetched(Ok(page)) => {
+                state.webview_content.load_html(&page);
+                ScreenOutput::none()
             }
             _ => ScreenOutput::none(),
         }

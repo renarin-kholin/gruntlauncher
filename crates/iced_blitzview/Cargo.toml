@@ -1,0 +1,41 @@
+[package]
+name = "iced_blitzview"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "An HTML/CSS view widget for iced, powered by the Blitz engine"
+license = "MIT OR Apache-2.0"
+keywords = ["iced", "html", "css", "webview", "blitz"]
+categories = ["gui", "rendering"]
+
+[dependencies]
+iced = { version = "0.14", features = ["image", "advanced"] }
+
+# The Blitz HTML/CSS engine. Pinned exactly: Blitz is pre-1.0 and its alpha
+# releases only guarantee compatibility within a single version.
+blitz-traits = "=0.3.0-alpha.4"
+blitz-dom = "=0.3.0-alpha.4"
+blitz-html = "=0.3.0-alpha.4"
+blitz-paint = "=0.3.0-alpha.4"
+blitz-net = "=0.3.0-alpha.4"
+
+# CPU rasterization of the painted scene. The GPU (wgpu) vello backend is not
+# usable here: iced 0.14 is on wgpu 27 while vello 0.9 requires wgpu 29, so the
+# two cannot share a device. vello_cpu is SIMD + multithreaded and repaints
+# only happen on actual document changes.
+anyrender = "0.10"
+anyrender_vello_cpu = "0.13"
+
+# Types shared with blitz-traits (versions must stay in sync with it)
+keyboard-types = "0.7"
+cursor-icon = "1"
+kurbo = "0.13"
+peniko = "0.6"
+
+tokio = { version = "1", features = ["rt-multi-thread"] }
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "charset"] }
+url = "2"
+
+[[example]]
+name = "browser"
+
