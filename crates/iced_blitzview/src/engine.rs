@@ -14,8 +14,8 @@ use std::time::Instant;
 use blitz_dom::{Document as _, DocumentConfig};
 use blitz_html::HtmlDocument;
 use blitz_traits::events::{
-    BlitzPointerEvent, BlitzPointerId, MouseEventButton,
-    MouseEventButtons, PointerCoords, PointerDetails, UiEvent,
+    BlitzPointerEvent, BlitzPointerId, MouseEventButton, MouseEventButtons, PointerCoords,
+    PointerDetails, UiEvent,
 };
 use blitz_traits::navigation::NavigationOptions;
 use blitz_traits::net::NetProvider;
@@ -209,8 +209,7 @@ impl Engine {
             return;
         }
 
-        let mut viewport =
-            Viewport::new(physical_width, physical_height, scale, self.color_scheme);
+        let mut viewport = Viewport::new(physical_width, physical_height, scale, self.color_scheme);
         viewport.set_zoom(zoom);
 
         self.doc.set_viewport(viewport);
@@ -368,9 +367,7 @@ impl Engine {
                 let dy = f64::from(y) * 40.0 / zoom;
                 (dx, dy)
             }
-            iced::mouse::ScrollDelta::Pixels { x, y } => {
-                (f64::from(x) / zoom, f64::from(y) / zoom)
-            }
+            iced::mouse::ScrollDelta::Pixels { x, y } => (f64::from(x) / zoom, f64::from(y) / zoom),
         };
 
         // Directly scroll the viewport — this is much cheaper than going
@@ -500,6 +497,9 @@ mod tests {
             }
         }
         println!("non-white pixels in image region: {non_white}");
-        assert!(non_white > 5000, "image did not paint (non_white={non_white})");
+        assert!(
+            non_white > 5000,
+            "image did not paint (non_white={non_white})"
+        );
     }
 }
