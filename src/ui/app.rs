@@ -185,6 +185,7 @@ fn window_settings() -> iced::window::Settings {
     iced::window::Settings {
         size: Size::new(1200.0, 700.0),
         platform_specific: PlatformSpecific {
+            #[cfg(target_os = "linux")]
             application_id: GRUNT_LAUNCHER_ID.into(),
             ..PlatformSpecific::default()
         },
