@@ -22,7 +22,7 @@ jobs:
 
       - name: Install mold (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y mold clang
+        run: sudo apt-get update && sudo apt-get install -y mold clang pkg-config libfontconfig1-dev
 
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
