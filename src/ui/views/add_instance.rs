@@ -1,5 +1,3 @@
-use std::fs::read_to_string;
-
 use iced::{
     Element, Length, Task,
     alignment::{Horizontal, Vertical},
@@ -8,7 +6,7 @@ use iced::{
         button, column, container, image, right_center, row, rule, scrollable, text, text_input,
     },
 };
-use iced_blitzview::{Content, fetch, fetch_html, web_view};
+use iced_blitzview::web_view;
 use uuid::Uuid;
 
 use crate::{

@@ -1,7 +1,4 @@
-use std::{
-    env::home_dir,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 

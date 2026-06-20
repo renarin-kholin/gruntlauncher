@@ -1,10 +1,8 @@
-use std::{fs::read_to_string, time::Duration};
-
 use iced::{
-    Border, Element, Length, Size, Subscription, Task, Theme, alignment,
+    Border, Element, Length, Size, Task, Theme, alignment,
     border::Radius,
-    padding, time,
-    widget::{column, container, opaque, rule, stack, text},
+    padding,
+    widget::{column, container, opaque, stack, text},
     window::{icon, settings::PlatformSpecific},
 };
 

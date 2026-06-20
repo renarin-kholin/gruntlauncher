@@ -1,11 +1,6 @@
-use std::{
-    env::home_dir,
-    fs::{self, File},
-    io::Write,
-    path::{self, PathBuf},
-};
+use std::fs::{self};
 
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use crate::core::config::Config;
 

@@ -1,5 +1,4 @@
 use iced_blitzview::Content;
-use uuid::Uuid;
 
 use crate::core::{config::Config, instance::GruntInstance};
 
