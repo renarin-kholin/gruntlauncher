@@ -3,6 +3,7 @@ use tracing_subscriber::EnvFilter;
 pub mod assets;
 pub mod core;
 pub mod error;
+pub mod services;
 pub mod ui;
 
 pub use error::GruntError;

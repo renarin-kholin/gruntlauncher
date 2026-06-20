@@ -2,11 +2,12 @@ use iced::{
     Element, Length,
     alignment::{Horizontal, Vertical},
     padding,
-    widget::{button, column, image, row, rule, scrollable, text},
+    widget::{self, button, column, image::Handle, row, rule, scrollable, text},
 };
 
 use crate::{
-    core::instance::GruntInstance,
+    assets::GRUNT_ICON,
+    core::instance::{GruntInstance, InstanceId},
     ui::{
         GruntAction, GruntState,
         views::{self, ScreenOutput, add_instance},
@@ -15,10 +16,9 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Screen {
-    selected_instance: Option<usize>,
+    selected_instance: Option<InstanceId>,
+    icon_handles: Vec<Handle>,
 }
-//Enumerated usize instance id for selection
-type InstanceId = usize;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -36,13 +36,16 @@ impl Screen {
     pub fn new() -> Self {
         Self {
             selected_instance: None,
+            icon_handles: vec![Handle::from_bytes(GRUNT_ICON)],
         }
     }
 
-    fn instance(&self, id: InstanceId, instance: &GruntInstance) -> Element<'_, Message> {
+    fn instance<'a>(&'a self, instance: &'a GruntInstance) -> Element<'a, Message> {
         button(
             column![
-                image("assets/icons/logo.png").height(80.0).width(80.0),
+                widget::image(self.icon_handles[0].clone())
+                    .height(80.0)
+                    .width(80.0),
                 text!("{}", instance.name).wrapping(text::Wrapping::Glyph)
             ]
             .height(Length::Shrink)
@@ -50,11 +53,11 @@ impl Screen {
             .align_x(Horizontal::Center)
             .spacing(10.0),
         )
-        .on_press(Message::SelectInstance(id))
+        .on_press(Message::SelectInstance(instance.id))
         .style(move |theme, status| {
             let mut status = status;
             if let Some(selected_instance) = &self.selected_instance
-                && *selected_instance == id
+                && *selected_instance == instance.id
             {
                 status = button::Status::Pressed;
             }
@@ -64,7 +67,7 @@ impl Screen {
         })
         .into()
     }
-    pub fn view(&self, state: &GruntState) -> Element<'_, Message> {
+    pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         column![
             //Topbar
             row![
@@ -83,8 +86,7 @@ impl Screen {
                     row(state
                         .instances
                         .iter()
-                        .enumerate()
-                        .map(|(i, instance)| self.instance(i, instance)))
+                        .map(|instance| self.instance(instance)))
                     .spacing(10.0)
                     .padding(padding::all(10.0))
                     .width(Length::Fill)

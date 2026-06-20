@@ -9,6 +9,7 @@ use iced::{
     },
 };
 use iced_blitzview::{Content, fetch, fetch_html, web_view};
+use uuid::Uuid;
 
 use crate::{
     core::instance::GruntInstance,
@@ -103,6 +104,8 @@ impl Screen {
         Self {
             instance: GruntInstance {
                 name: String::from(""),
+                id: Uuid::new_v4(),
+                mods: vec![],
             },
 
             columns: vec![

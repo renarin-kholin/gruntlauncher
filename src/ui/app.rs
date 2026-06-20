@@ -10,7 +10,8 @@ use iced::{
 
 use crate::{
     assets::GRUNT_ICON,
-    core::instance::GruntInstance,
+    core::{config::Config, instance::GruntInstance},
+    services::{config::LoadConfigError, instance::LoadInstancesError},
     ui::{
         GruntState,
         theme::grunt_theme,
@@ -22,6 +23,9 @@ const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
 pub enum GruntMessage {
     HomeMessage(home::Message),
     AddInstanceMessage(add_instance::Message),
+
+    InstancesLoaded(Result<Vec<GruntInstance>, LoadInstancesError>),
+    ConfigLoaded(Result<Config, LoadConfigError>),
 }
 
 #[derive(Clone)]
@@ -38,12 +42,18 @@ pub struct GruntLauncher {
 }
 
 impl GruntLauncher {
-    pub fn new() -> Self {
-        Self {
-            overlay: None,
-            home: home::Screen::new(),
-            state: GruntState::default(),
-        }
+    pub fn new() -> (Self, Task<GruntMessage>) {
+        (
+            Self {
+                overlay: None,
+                home: home::Screen::new(),
+                state: GruntState::default(),
+            },
+            Task::perform(
+                async move { crate::services::config::load_config() },
+                GruntMessage::ConfigLoaded,
+            ),
+        )
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
         use GruntMessage::*;
@@ -105,10 +115,29 @@ impl GruntLauncher {
         use GruntMessage::*;
         use Screen::*;
         match message {
+            ConfigLoaded(load_result) => {
+                if let Ok(config) = load_result {
+                    self.state.config = Some(config.clone());
+                    return Task::perform(
+                        async move {
+                            crate::services::instance::load_instances(&config.instances_folder)
+                        },
+                        InstancesLoaded,
+                    );
+                }
+                Task::none()
+            }
+            InstancesLoaded(load_result) => {
+                if let Ok(instances) = load_result {
+                    self.state.instances.extend(instances);
+                }
+                Task::none()
+            }
+
+            //Screen message wrappers
             HomeMessage(m) => {
                 let out = self.home.update(m);
-                self.handle_actions(out.actions)
-                    .chain(out.task.map(HomeMessage))
+                Task::batch([self.handle_actions(out.actions), out.task.map(HomeMessage)])
             }
             AddInstanceMessage(m) if let Some(AddInstance(s)) = &mut self.overlay => {
                 let out = s.update(m, &mut self.state);
@@ -122,7 +151,6 @@ impl GruntLauncher {
     }
     fn handle_action(&mut self, action: GruntAction) -> Task<GruntMessage> {
         use GruntAction::*;
-        use GruntMessage::*;
         match action {
             SwitchScreen(s) => {
                 self.overlay = Some(s);

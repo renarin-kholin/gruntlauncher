@@ -10,6 +10,7 @@ members = [".", "crates/iced_blitzview"]
 opt-level = 2
 
 [dependencies]
+directories = "6.0.0"
 iced = { version = "0.14.0", features = ["image", "selector", "debug", "advanced", "lazy", "tokio", "wgpu"] }
 # iced_webview_v2 = { git = "https://github.com/franzos/iced_webview_v2", default-features = false, features = ["blitz", "litehtml"] }  # or "cef"
 iced_blitzview = { path = "crates/iced_blitzview"}
@@ -18,6 +19,7 @@ reqwest = { version = "0.13.4", features = ["json"] }
 serde = "1.0.228"
 serde_json = "1.0.150"
 thiserror = "2.0.18"
+toml = "1.1.2"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.23.2", features = ["v4"] }

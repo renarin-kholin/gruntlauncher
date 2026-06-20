@@ -1,22 +1,19 @@
 use iced_blitzview::Content;
+use uuid::Uuid;
 
-use crate::core::instance::GruntInstance;
+use crate::core::{config::Config, instance::GruntInstance};
 
 pub struct GruntState {
     pub instances: Vec<GruntInstance>,
     pub webview_content: Content,
+    pub config: Option<Config>,
 }
-//Temporary initializer with mock data
 impl Default for GruntState {
     fn default() -> Self {
         Self {
-            instances: vec![
-                GruntInstance {
-                    name: "Test".to_string()
-                };
-                20
-            ],
+            instances: vec![],
             webview_content: Content::new(),
+            config: None,
         }
     }
 }
