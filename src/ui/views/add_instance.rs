@@ -21,6 +21,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum VersionType {
     Release,
+    #[expect(dead_code)]
     PreRelease,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
