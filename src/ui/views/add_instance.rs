@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use iced::{
     Element, Length, Task,
     alignment::{Horizontal, Vertical},
@@ -10,7 +12,11 @@ use iced_blitzview::web_view;
 use uuid::Uuid;
 
 use crate::{
-    core::instance::GruntInstance,
+    core::{
+        instance::GruntInstance,
+        version::{GameVersion, VersionCatalog},
+    },
+    services::version::{VersionsError, load_versions},
     ui::{
         GruntAction, GruntState,
         views::ScreenOutput,
@@ -71,8 +77,11 @@ pub struct Screen {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    ScreenLoaded,
+
     NameChanged(String),
     SelectMod(usize),
+    SelectVersion(usize),
     Navigate(Step),
     OpenInBrowser(String),
     Next,
@@ -82,6 +91,8 @@ pub enum Message {
 
     //Webview events
     ModViewPageFetched(Result<String, String>),
+
+    VersionsLoaded(Result<Vec<GameVersion>, VersionsError>),
 }
 
 impl Default for Screen {
@@ -105,6 +116,11 @@ impl Screen {
                 name: String::from(""),
                 id: Uuid::new_v4(),
                 mods: vec![],
+                version: GameVersion {
+                    version: semver::Version::from_str("1.22.3").unwrap(),
+                    filename: "awa".to_string(),
+                    url: "awa".to_string(),
+                },
             },
 
             columns: vec![
@@ -138,11 +154,15 @@ impl Screen {
             .height(Length::Shrink),
             rule::horizontal(1.0),
             scrollable(
-                container(table::Table::new(&self.columns, &self.rows).row_height(30.0))
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .padding(padding::all(1.0))
-                    .style(container::bordered_box)
+                container(
+                    table::Table::new(&self.columns, &self.rows)
+                        .row_height(30.0)
+                        .on_select(SelectVersion)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding(padding::all(1.0))
+                .style(container::bordered_box)
             )
             .height(Length::Fill)
             .width(Length::Fill)
@@ -198,7 +218,7 @@ impl Screen {
                 column![
                     text!("Instance Name "),
                     text!("{}", &self.instance.name),
-                    text!("1.20.2")
+                    text!("{}", &self.instance.version.version.to_string())
                 ]
                 .spacing(5.0)
             ]
@@ -394,6 +414,11 @@ impl Screen {
         use Message::*;
 
         match message {
+            //First message received when screen is opened
+            ScreenLoaded => ScreenOutput::task(Task::perform(
+                async move { load_versions().await },
+                Message::VersionsLoaded,
+            )),
             Cancel => ScreenOutput::action(CloseScreen),
             NameChanged(name) => {
                 self.instance.name = name;
@@ -411,11 +436,30 @@ impl Screen {
                 self.step.back();
                 ScreenOutput::none()
             }
+            SelectVersion(i) => {
+                if let VersionCatalog::Loaded { versions } = &state.vs_versions {
+                    self.instance.version = versions[i].clone();
+                }
+                ScreenOutput::none()
+            }
+
             SelectMod(i) => {
                 self.selected_mod = Some(i);
                 ScreenOutput::task(Self::fetch_mod(
                     "https://mods.vintagestory.at/api/mod/7286".to_string(),
                 ))
+            }
+            VersionsLoaded(Ok(gv)) => {
+                state.vs_versions.load(gv);
+                self.rows = if let VersionCatalog::Loaded { versions } = &state.vs_versions {
+                    versions
+                        .iter()
+                        .map(|v| vec![v.version.to_string(), "Release".to_string()])
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![]
+                };
+                ScreenOutput::none()
             }
             Message::CreateInstance => {
                 ScreenOutput::action(GruntAction::CreateInstance(self.instance.clone()))

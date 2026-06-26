@@ -1,5 +1,5 @@
 use iced::{
-    Element, Length,
+    Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{self, button, column, image::Handle, row, rule, scrollable, text},
@@ -7,7 +7,11 @@ use iced::{
 
 use crate::{
     assets::GRUNT_ICON,
-    core::instance::{GruntInstance, InstanceId},
+    core::{
+        instance::{GruntInstance, InstanceId},
+        version::GameVersion,
+    },
+    services::version::{VersionsError, load_versions},
     ui::{
         GruntAction, GruntState,
         views::{self, ScreenOutput, add_instance},
@@ -24,6 +28,7 @@ pub struct Screen {
 pub enum Message {
     SelectInstance(InstanceId),
     AddInstance,
+    VersionsLoaded(Result<Vec<GameVersion>, VersionsError>),
 }
 
 impl Default for Screen {
@@ -46,9 +51,11 @@ impl Screen {
                 widget::image(self.icon_handles[0].clone())
                     .height(80.0)
                     .width(80.0),
-                text!("{}", instance.name).wrapping(text::Wrapping::Glyph)
+                text!("{}", instance.name)
+                    .wrapping(text::Wrapping::Glyph)
+                    .center()
             ]
-            .height(Length::Shrink)
+            .height(Length::Fixed(120.0))
             .width(Length::Fixed(100.0))
             .align_x(Horizontal::Center)
             .spacing(10.0),
@@ -109,7 +116,7 @@ impl Screen {
         .width(Length::Fill)
         .into()
     }
-    pub fn update(&mut self, message: Message) -> ScreenOutput<Message> {
+    pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
         match message {
             Message::AddInstance => {
@@ -120,6 +127,10 @@ impl Screen {
             Message::SelectInstance(id) => {
                 self.selected_instance = Some(id);
             }
+            Message::VersionsLoaded(Ok(gv)) => {
+                state.vs_versions.load(gv);
+            }
+            _ => {}
         }
         ScreenOutput::none()
     }

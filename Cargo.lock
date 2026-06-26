@@ -1827,6 +1827,7 @@ dependencies = [
  "iced_blitzview",
  "image",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
