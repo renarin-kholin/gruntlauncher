@@ -38,7 +38,8 @@ pub fn load_config() -> Result<Config, LoadConfigError> {
         Ok(text) => Ok(toml::from_str(&text)?),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             let instances_dir = proj_dir.data_dir().join("instances");
-            let config = Config::new(instances_dir, vec![]);
+            let installations_dir = proj_dir.data_dir().join("installations");
+            let config = Config::new(instances_dir, installations_dir, vec![]);
             fs::write(&config_path, toml::to_string_pretty(&config)?)?;
             Ok(config)
         }

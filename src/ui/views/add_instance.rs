@@ -1,14 +1,17 @@
-use std::str::FromStr;
-
 use iced::{
-    Element, Length, Task,
+    Element,
+    Length::{self, Fill, Shrink},
+    Task,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
-        button, column, container, image, right_center, row, rule, scrollable, text, text_input,
+        button, center, column, container, image, right_center, row, rule, scrollable, text,
+        text_input,
     },
 };
+use iced_aw::spinner;
 use iced_blitzview::web_view;
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
@@ -16,7 +19,7 @@ use crate::{
         instance::GruntInstance,
         version::{GameVersion, VersionCatalog},
     },
-    services::version::{VersionsError, load_versions},
+    services::version::{VersionsError, load_versions, refresh_versions},
     ui::{
         GruntAction, GruntState,
         views::ScreenOutput,
@@ -24,26 +27,6 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum VersionType {
-    Release,
-    #[expect(dead_code)]
-    PreRelease,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Version {
-    pub name: String,
-    version_type: VersionType,
-    pub released_date: String,
-}
-impl Version {
-    pub fn version_type(&self) -> String {
-        match self.version_type {
-            VersionType::Release => "Release".to_string(),
-            VersionType::PreRelease => "Pre-release".to_string(),
-        }
-    }
-}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
     Basic,
@@ -82,6 +65,7 @@ pub enum Message {
     NameChanged(String),
     SelectMod(usize),
     SelectVersion(usize),
+    RefreshVersions,
     Navigate(Step),
     OpenInBrowser(String),
     Next,
@@ -103,41 +87,62 @@ impl Default for Screen {
 
 impl Screen {
     pub fn new() -> Self {
-        let versions = vec![
-            Version {
-                name: "1.21.2".to_string(),
-                version_type: VersionType::Release,
-                released_date: "21/02/2026".to_string(),
-            };
-            20
-        ];
         Self {
             instance: GruntInstance {
                 name: String::from(""),
                 id: Uuid::new_v4(),
                 mods: vec![],
-                version: GameVersion {
-                    version: semver::Version::from_str("1.22.3").unwrap(),
-                    filename: "awa".to_string(),
-                    url: "awa".to_string(),
-                },
+                version: GameVersion::default(),
             },
 
             columns: vec![
                 TableColumn::new("Version", 150.0).min_width(80.0),
                 TableColumn::new("Type", 300.0).min_width(80.0),
             ],
-            rows: versions
-                .iter()
-                .map(|v| vec![v.name.clone(), v.version_type()])
-                .collect(),
+            rows: vec![],
             step: Step::Basic,
             selected_mod: None,
         }
     }
 
-    fn view_basic(&self, _state: &GruntState) -> Element<'_, Message> {
+    fn view_basic<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
+        let mut page_content = column![];
+        page_content = if matches!(state.vs_versions, VersionCatalog::Loading) {
+            page_content.push(
+                center(
+                    column![
+                        text!("Loading Versions"),
+                        spinner::Spinner::default().width(30.0).height(30.0)
+                    ]
+                    .align_x(Horizontal::Center)
+                    .height(Shrink)
+                    .spacing(10.0),
+                )
+                .height(Fill)
+                .width(Fill),
+            )
+        } else {
+            page_content.push(
+                scrollable(
+                    container(
+                        table::Table::new(&self.columns, &self.rows)
+                            .row_height(30.0)
+                            .on_select(SelectVersion),
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(padding::all(1.0))
+                    .style(container::bordered_box),
+                )
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .style(|theme, status| scrollable::Style {
+                    container: container::bordered_box(theme),
+                    ..scrollable::default(theme, status)
+                }),
+            )
+        };
         column![
             //Instance details (name and icon)
             row![
@@ -153,25 +158,15 @@ impl Screen {
             .padding(padding::all(10.0))
             .height(Length::Shrink),
             rule::horizontal(1.0),
-            scrollable(
-                container(
-                    table::Table::new(&self.columns, &self.rows)
-                        .row_height(30.0)
-                        .on_select(SelectVersion)
-                )
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .padding(padding::all(1.0))
-                .style(container::bordered_box)
-            )
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .style(|theme, status| {
-                scrollable::Style {
-                    container: container::bordered_box(theme),
-                    ..scrollable::default(theme, status)
-                }
-            }),
+            button("Refresh Versions")
+                .on_press(RefreshVersions)
+                .style(move |theme, mut status| {
+                    if matches!(state.vs_versions, VersionCatalog::Loading) {
+                        status = button::Status::Disabled;
+                    }
+                    button::primary(theme, status)
+                }),
+            page_content,
             row![
                 button("Next").on_press(Next).style(button::success),
                 button("Cancel").on_press(Cancel).style(button::danger)
@@ -404,7 +399,6 @@ impl Screen {
                 .json()
                 .await
                 .unwrap();
-            tracing::debug!("{:?}", response);
             let html = response["mod"]["text"].as_str().unwrap();
             Message::ModViewPageFetched(Ok(html.to_string()))
         })
@@ -415,10 +409,21 @@ impl Screen {
 
         match message {
             //First message received when screen is opened
-            ScreenLoaded => ScreenOutput::task(Task::perform(
-                async move { load_versions().await },
-                Message::VersionsLoaded,
-            )),
+            ScreenLoaded => {
+                if let VersionCatalog::Loaded { versions } = &state.vs_versions {
+                    self.rows = versions
+                        .iter()
+                        .map(|v| vec![v.version.to_string(), "Release".to_string()])
+                        .collect::<Vec<_>>();
+                    ScreenOutput::none()
+                } else {
+                    state.vs_versions.loading();
+                    ScreenOutput::task(Task::perform(
+                        async move { load_versions().await },
+                        Message::VersionsLoaded,
+                    ))
+                }
+            }
             Cancel => ScreenOutput::action(CloseScreen),
             NameChanged(name) => {
                 self.instance.name = name;
@@ -442,6 +447,10 @@ impl Screen {
                 }
                 ScreenOutput::none()
             }
+            RefreshVersions => {
+                state.vs_versions.loading();
+                ScreenOutput::task(Task::perform(refresh_versions(), VersionsLoaded))
+            }
 
             SelectMod(i) => {
                 self.selected_mod = Some(i);
@@ -449,16 +458,20 @@ impl Screen {
                     "https://mods.vintagestory.at/api/mod/7286".to_string(),
                 ))
             }
-            VersionsLoaded(Ok(gv)) => {
-                state.vs_versions.load(gv);
-                self.rows = if let VersionCatalog::Loaded { versions } = &state.vs_versions {
-                    versions
-                        .iter()
-                        .map(|v| vec![v.version.to_string(), "Release".to_string()])
-                        .collect::<Vec<_>>()
+            VersionsLoaded(loaded_result) => {
+                if let Ok(gv) = loaded_result {
+                    state.vs_versions.load(gv);
+                    self.rows = if let VersionCatalog::Loaded { versions } = &state.vs_versions {
+                        versions
+                            .iter()
+                            .map(|v| vec![v.version.to_string(), "Release".to_string()])
+                            .collect::<Vec<_>>()
+                    } else {
+                        vec![]
+                    };
                 } else {
-                    vec![]
-                };
+                    error!("{:?}", loaded_result);
+                }
                 ScreenOutput::none()
             }
             Message::CreateInstance => {

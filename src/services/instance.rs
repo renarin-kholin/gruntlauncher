@@ -1,11 +1,10 @@
-use std::{fs, io::Write, path::Path, str::FromStr};
+use std::{fs, io::Write, path::Path};
 
 use iced::futures::io;
 use thiserror::Error;
-use tracing::error;
-use uuid::Uuid;
+use tracing::{debug, error, info};
 
-use crate::core::{instance::GruntInstance, version::GameVersion};
+use crate::core::instance::GruntInstance;
 
 #[derive(Error, Debug, Clone)]
 pub enum InstancesError {
@@ -30,9 +29,13 @@ pub fn load_instances(instances_path: &Path) -> Result<Vec<GruntInstance>> {
     let mut instances = vec![];
     for entry in dir {
         let entry = entry?;
+        debug!("{:?}", entry);
         if let Ok(instance_config) = fs::read_to_string(entry.path().join("instance.toml")) {
             match toml::from_str(&instance_config) {
-                Ok(instance) => instances.push(instance),
+                Ok(instance) => {
+                    info!("Loaded instance config: {:?}", instance);
+                    instances.push(instance)
+                }
                 Err(e) => {
                     error!("Error trying to parse instance config: {}", e);
                 }

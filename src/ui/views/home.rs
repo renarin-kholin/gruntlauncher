@@ -1,5 +1,5 @@
 use iced::{
-    Element, Length, Task,
+    Element, Length,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{self, button, column, image::Handle, row, rule, scrollable, text},
@@ -11,7 +11,7 @@ use crate::{
         instance::{GruntInstance, InstanceId},
         version::GameVersion,
     },
-    services::version::{VersionsError, load_versions},
+    services::version::VersionsError,
     ui::{
         GruntAction, GruntState,
         views::{self, ScreenOutput, add_instance},

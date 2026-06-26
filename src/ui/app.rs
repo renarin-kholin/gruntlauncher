@@ -5,6 +5,7 @@ use iced::{
     widget::{column, container, opaque, stack, text},
     window::{icon, settings::PlatformSpecific},
 };
+use tracing::info;
 
 use crate::{
     assets::GRUNT_ICON,
@@ -117,18 +118,15 @@ impl GruntLauncher {
         use Screen::*;
         match message {
             ScreenSwitched => {
-                match &self.overlay {
-                    Some(overlay) => {
-                        match overlay {
-                            //can send an initial message to an overlay when it opens
-                            &Screen::AddInstance(_) => {
-                                return Task::done(GruntMessage::AddInstanceMessage(
-                                    add_instance::Message::ScreenLoaded,
-                                ));
-                            }
+                if let Some(overlay) = &self.overlay {
+                    match overlay {
+                        //can send an initial message to an overlay when it opens
+                        &Screen::AddInstance(_) => {
+                            return Task::done(GruntMessage::AddInstanceMessage(
+                                add_instance::Message::ScreenLoaded,
+                            ));
                         }
                     }
-                    None => {}
                 }
                 Task::none()
             }
@@ -146,6 +144,7 @@ impl GruntLauncher {
                 Task::none()
             }
             InstancesLoaded(load_result) => {
+                info!("Instances loaded.");
                 if let Ok(instances) = load_result {
                     self.state.instances.extend(instances);
                 }

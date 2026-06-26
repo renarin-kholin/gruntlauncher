@@ -1,10 +1,52 @@
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LocalGameVersion {
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RemoteGameVersion {
+    pub filename: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum GameVersionSource {
+    Local(LocalGameVersion),
+    Remote(RemoteGameVersion),
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GameVersion {
     pub version: semver::Version,
-    pub filename: String,
-    pub url: String,
+    pub source: GameVersionSource,
+}
+impl GameVersion {
+    pub fn remote(version: semver::Version, filename: String, url: String) -> Self {
+        Self {
+            version,
+            source: GameVersionSource::Remote(RemoteGameVersion { filename, url }),
+        }
+    }
+    pub fn local(version: semver::Version, path: &Path) -> Self {
+        Self {
+            version,
+            source: GameVersionSource::Local(LocalGameVersion { path: path.into() }),
+        }
+    }
+}
+impl Default for GameVersion {
+    fn default() -> Self {
+        Self {
+            version: semver::Version::new(1, 22, 2),
+            source: GameVersionSource::Local(LocalGameVersion {
+                path: PathBuf::new(),
+            }),
+        }
+    }
 }
 
 pub enum VersionCatalog {
