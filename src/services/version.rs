@@ -233,7 +233,6 @@ pub async fn download_version(
     }
     Ok(None)
 }
-#[cfg(not(target_os = "windows"))]
 pub async fn extract_archive(
     gameversion: GameVersion,
     archive_path: PathBuf,
@@ -245,36 +244,23 @@ pub async fn extract_archive(
     tokio::fs::create_dir_all(&install_path).await?;
 
     progress.send(InstallProgress::Installing).await;
-    let mut extract_child = Command::new("tar")
+
+    #[cfg(not(target_os = "windows"))]
+    let extract_child = Command::new("tar")
         .arg("-xzf")
         .arg(archive_path.as_os_str())
         .arg("-C")
         .arg(install_path.as_os_str())
         .arg("--strip-components=1")
-        .spawn()?;
-    extract_child.wait().await?;
-
-    Ok(install_path)
-}
-
-#[cfg(target_os = "windows")]
-pub async fn extract_archive(
-    gameversion: GameVersion,
-    archive_path: PathBuf,
-    versions_path: PathBuf,
-    progress: &mut sipper::Sender<InstallProgress>,
-) -> Result<PathBuf, VersionsError> {
-    let install_path = versions_path.join(gameversion.version.to_string());
-    tokio::fs::create_dir_all(&install_path).await?;
-
-    progress.send(InstallProgress::Installing).await;
-
-    let mut install_child = Command::new(archive_path.as_os_str())
+        .status();
+    #[cfg(target_os = "windows")]
+    let extract_child = Command::new(archive_path.as_os_str())
         .arg("/VERYSILENT")
         .arg("/SUPRESSMSGBOXES")
         .arg("/DIR=")
         .arg(install_path.as_os_str())
-        .status()
-        .await?;
+        .status();
+    extract_child.await?;
+
     Ok(install_path)
 }
