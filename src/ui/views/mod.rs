@@ -4,7 +4,6 @@ use crate::ui::GruntAction;
 pub mod add_instance;
 pub mod home;
 //The current actively shown Screen
-#[derive(Clone)]
 pub enum Screen {
     AddInstance(add_instance::Screen),
 }

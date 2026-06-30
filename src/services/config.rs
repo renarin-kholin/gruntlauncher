@@ -1,45 +1,47 @@
 use std::fs::{self};
+use std::sync::Arc;
 
 use tracing::info;
 
 use crate::core::config::Config;
+use crate::paths::{self, ProjectDirError};
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum LoadConfigError {
-    #[error("Error while reading the config file.")]
-    IOError(String),
+    #[error("io error: {0}")]
+    Io(Arc<std::io::Error>),
 
-    #[error("Error when trying to deserialize config file.")]
+    #[error("error when trying to deserialize config file: {0}")]
     DeserializeError(#[from] toml::de::Error),
 
-    #[error("Error when trying to serialize config file.")]
+    #[error("error when trying to serialize config file: {0}")]
     SerializeError(#[from] toml::ser::Error),
 
-    #[error("Could not load project directories.")]
-    ProjectDirError,
+    #[error(transparent)]
+    ProjectDir(#[from] ProjectDirError),
 }
 impl From<std::io::Error> for LoadConfigError {
     fn from(value: std::io::Error) -> Self {
-        LoadConfigError::IOError(value.to_string())
+        LoadConfigError::Io(Arc::new(value))
     }
 }
 
 pub fn load_config() -> Result<Config, LoadConfigError> {
     info!("Loading config");
 
-    let proj_dir = directories::ProjectDirs::from("com", "renarin", "gruntlauncher")
-        .ok_or(LoadConfigError::ProjectDirError)?;
-
-    let config_dir = proj_dir.config_dir();
-    fs::create_dir_all(config_dir)?;
+    let config_dir = paths::config_dir()?;
+    fs::create_dir_all(&config_dir)?;
     let config_path = config_dir.join("config.toml");
 
     match fs::read_to_string(&config_path) {
         Ok(text) => Ok(toml::from_str(&text)?),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let instances_dir = proj_dir.data_dir().join("instances");
-            let installations_dir = proj_dir.data_dir().join("installations");
-            let config = Config::new(instances_dir, installations_dir, vec![]);
+            let data_dir = paths::data_dir()?;
+            let config = Config::new(
+                data_dir.join("instances"),
+                data_dir.join("installations"),
+                vec![],
+            );
             fs::write(&config_path, toml::to_string_pretty(&config)?)?;
             Ok(config)
         }

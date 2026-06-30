@@ -1,8 +1,10 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use tracing_subscriber::EnvFilter;
 
 pub mod assets;
 pub mod core;
 pub mod error;
+pub mod paths;
 pub mod services;
 pub mod ui;
 

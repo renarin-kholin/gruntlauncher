@@ -37,18 +37,13 @@ impl GameVersion {
             source: GameVersionSource::Local(LocalGameVersion { path: path.into() }),
         }
     }
-}
-impl Default for GameVersion {
-    fn default() -> Self {
+    pub fn to_local(&self, path: &Path) -> Self {
         Self {
-            version: semver::Version::new(1, 22, 2),
-            source: GameVersionSource::Local(LocalGameVersion {
-                path: PathBuf::new(),
-            }),
+            version: self.version.clone(),
+            source: GameVersionSource::Local(LocalGameVersion { path: path.into() }),
         }
     }
 }
-
 pub enum VersionCatalog {
     NotLoaded,
     Loading,
