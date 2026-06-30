@@ -74,7 +74,7 @@ pub async fn launch_instance(instance: GruntInstance, instances_path: PathBuf) -
         #[cfg(not(target_os = "windows"))]
         let run_path = game.path.join("run.sh");
         #[cfg(target_os = "windows")]
-        let run_path = game.path.join("Vintagestory");
+        let run_path = game.path.join("Vintagestory.exe");
         debug!("{:?}", run_path);
         debug!("{:?}", data_path);
         debug!("{:?}", mods_path);
