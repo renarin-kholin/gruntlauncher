@@ -1,12 +1,9 @@
-use std::{
-    fs::{self},
-    io::Write,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
+use sipper::StreamExt;
 use thiserror::Error;
-use tokio::process::Command;
+use tokio::{io::AsyncWriteExt, process::Command};
+use tokio_stream::wrappers::ReadDirStream;
 use tracing::{debug, error, info};
 
 use crate::core::{instance::GruntInstance, version::GameVersionSource};
@@ -28,14 +25,17 @@ impl From<std::io::Error> for InstancesError {
         InstancesError::Io(Arc::new(value))
     }
 }
-pub fn load_instances(instances_path: &Path) -> Result<Vec<GruntInstance>> {
-    fs::create_dir_all(instances_path)?;
-    let dir = fs::read_dir(instances_path)?;
+pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance>> {
+    tokio::fs::create_dir_all(&instances_path).await?;
+    let dir = tokio::fs::read_dir(instances_path).await?;
+    let mut dir = ReadDirStream::new(dir);
     let mut instances = vec![];
-    for entry in dir {
+    while let Some(entry) = dir.next().await {
         let entry = entry?;
         debug!("{:?}", entry);
-        if let Ok(instance_config) = fs::read_to_string(entry.path().join("instance.toml")) {
+        if let Ok(instance_config) =
+            tokio::fs::read_to_string(entry.path().join("instance.toml")).await
+        {
             match toml::from_str(&instance_config) {
                 Ok(instance) => {
                     info!("Loaded instance config: {:?}", instance);
@@ -51,12 +51,18 @@ pub fn load_instances(instances_path: &Path) -> Result<Vec<GruntInstance>> {
     Ok(instances)
 }
 
-pub fn add_instance(instance: GruntInstance, instances_path: &Path) -> Result<GruntInstance> {
-    fs::create_dir_all(instances_path)?;
+pub async fn add_instance(
+    instance: GruntInstance,
+    instances_path: PathBuf,
+) -> Result<GruntInstance> {
+    tokio::fs::create_dir_all(&instances_path).await?;
     let instance_path = instances_path.join(instance.id.to_string());
-    fs::create_dir(&instance_path)?;
-    let mut instance_config = fs::File::create_new(instance_path.join("instance.toml"))?;
-    instance_config.write_all((toml::to_string(&instance)?).as_bytes())?;
+    tokio::fs::create_dir(&instance_path).await?;
+    let mut instance_config =
+        tokio::fs::File::create_new(instance_path.join("instance.toml")).await?;
+    instance_config
+        .write_all((toml::to_string(&instance)?).as_bytes())
+        .await?;
 
     Ok(instance)
 }

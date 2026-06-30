@@ -19,7 +19,7 @@ use tracing::{debug, error};
 use crate::{
     core::{
         instance::GruntInstance,
-        version::{GameVersion, VersionCatalog},
+        version::{GameVersion, GameVersionSource, VersionCatalog},
     },
     services::{
         instance::{self, InstancesError},
@@ -117,7 +117,14 @@ impl Screen {
             }
             _ => {
                 state.vs_versions.loading();
-                Task::perform(load_versions(), Message::VersionsLoaded)
+                if let Some(config) = state.config.clone() {
+                    Task::perform(
+                        load_versions(config.installations_folder),
+                        Message::VersionsLoaded,
+                    )
+                } else {
+                    Task::none()
+                }
             }
         };
 
@@ -233,12 +240,17 @@ impl Screen {
         use InstallProgress::*;
 
         let main_container = column![].spacing(10.0).padding(10.0);
-        match self.install_progress {
+        match &self.install_progress {
             NotStarted => main_container.push(text!("Starting download please wait...")),
             Downloading { downloaded, total } => main_container
                 .push(text!("Downloading game file"))
-                .push(progress_bar(0.0..=(total as f32), downloaded as f32)),
-            _ => main_container.push(text!("Not implemented yet.")),
+                .push(progress_bar(0.0..=(*total as f32), *downloaded as f32)),
+            Verifying => main_container.push(text!("Verifying the download hash...")),
+            Installing => main_container
+                .push(text!("Installing"))
+                .push(progress_bar(0.0..=100.0, 25.0)),
+            Done => main_container.push(text!("Finished installing.")),
+            Failed(e) => main_container.push(text!("{}", e)),
         }
         .into()
     }
@@ -483,7 +495,13 @@ impl Screen {
             }
             RefreshVersions => {
                 state.vs_versions.loading();
-                ScreenOutput::task(Task::perform(refresh_versions(), VersionsLoaded))
+                if let Some(config) = state.config.clone() {
+                    return ScreenOutput::task(Task::perform(
+                        refresh_versions(config.installations_folder),
+                        VersionsLoaded,
+                    ));
+                }
+                ScreenOutput::none()
             }
 
             SelectMod(i) => {
@@ -534,17 +552,15 @@ impl Screen {
                     let version = version.to_local(&installled_path);
                     let name = self.name.clone();
                     return ScreenOutput::task(Task::perform(
-                        async move {
-                            instance::add_instance(
-                                GruntInstance {
-                                    name,
-                                    id: uuid::Uuid::new_v4(),
-                                    mods: vec![],
-                                    version,
-                                },
-                                &config.instances_folder,
-                            )
-                        },
+                        instance::add_instance(
+                            GruntInstance {
+                                name,
+                                id: uuid::Uuid::new_v4(),
+                                mods: vec![],
+                                version,
+                            },
+                            config.instances_folder,
+                        ),
                         InstanceCreated,
                     ));
                 }
@@ -577,12 +593,18 @@ impl Screen {
         install_dir: PathBuf,
     ) -> impl Straw<PathBuf, InstallProgress, VersionsError> {
         sipper(async move |mut progress| {
-            let archive_path = download_version(version.clone(), &mut progress).await?;
-            let mut install_path = PathBuf::new();
-            if let Some(archive_path) = archive_path {
-                install_path =
-                    extract_archive(version, archive_path, install_dir, &mut progress).await?;
-            }
+            let install_path = if let GameVersionSource::Local(local_game) = version.source {
+                local_game.path
+            } else {
+                let archive_path = download_version(version.clone(), &mut progress).await?;
+                extract_archive(
+                    version,
+                    archive_path.ok_or(VersionsError::DownloadError)?,
+                    install_dir,
+                    &mut progress,
+                )
+                .await?
+            };
             progress.send(InstallProgress::Done).await;
             Ok(install_path)
         })

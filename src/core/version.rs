@@ -1,25 +1,28 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub struct LocalGameVersion {
     pub path: PathBuf,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub struct RemoteGameVersion {
     pub filename: String,
     pub url: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub enum GameVersionSource {
     Local(LocalGameVersion),
     Remote(RemoteGameVersion),
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
 pub struct GameVersion {
     pub version: semver::Version,
     pub source: GameVersionSource,
@@ -44,6 +47,21 @@ impl GameVersion {
         }
     }
 }
+pub fn merge_versions(local: Vec<GameVersion>, remote: Vec<GameVersion>) -> Vec<GameVersion> {
+    let mut by_version: HashMap<semver::Version, GameVersion> = HashMap::new();
+
+    for gv in remote {
+        by_version.insert(gv.version.clone(), gv);
+    }
+    for gv in local {
+        by_version.insert(gv.version.clone(), gv); // inserted second => local overwrites remote
+    }
+
+    let mut out: Vec<GameVersion> = by_version.into_values().collect();
+    out.sort_by(|a, b| b.version.cmp(&a.version)); // newest first
+    out
+}
+
 pub enum VersionCatalog {
     NotLoaded,
     Loading,

@@ -72,9 +72,7 @@ impl GruntLauncher {
                 if let Ok(config) = load_result {
                     self.state.config = Some(config.clone());
                     return Task::perform(
-                        async move {
-                            crate::services::instance::load_instances(&config.instances_folder)
-                        },
+                        crate::services::instance::load_instances(config.instances_folder),
                         InstancesLoaded,
                     );
                 }

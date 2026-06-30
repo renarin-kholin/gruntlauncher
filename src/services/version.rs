@@ -1,21 +1,15 @@
-use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::Write,
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 use iced::futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::process::Command;
-use tracing::warn;
+use tokio::{io::AsyncWriteExt, process::Command};
+use tokio_stream::wrappers::ReadDirStream;
+use tracing::{debug, error, warn};
 
 use crate::{
     assets::VSAPI_VERSIONS,
-    core::version::{GameVersion, GameVersionSource},
+    core::version::{GameVersion, GameVersionSource, merge_versions},
     paths::{self, ProjectDirError},
 };
 
@@ -82,6 +76,9 @@ pub enum VersionsError {
 
     #[error("request to the server failed: {0}")]
     Reqwest(Arc<reqwest::Error>),
+
+    #[error("Failed downloading archive")]
+    DownloadError,
 }
 impl From<std::io::Error> for VersionsError {
     fn from(value: std::io::Error) -> Self {
@@ -94,21 +91,42 @@ impl From<reqwest::Error> for VersionsError {
     }
 }
 pub async fn load_local_versions(
-    installations_path: &Path,
+    installations_path: PathBuf,
 ) -> Result<Vec<GameVersion>, VersionsError> {
-    fs::create_dir_all(installations_path)?;
-    Ok(vec![])
+    tokio::fs::create_dir_all(&installations_path).await?;
+    let versions_dir = tokio::fs::read_dir(installations_path).await?;
+    let mut versions_dir = ReadDirStream::new(versions_dir);
+    let mut gameversions = vec![];
+    while let Some(version) = versions_dir.next().await {
+        let version = version?;
+        match semver::Version::from_str(&format!("{}", version.file_name().as_os_str().display())) {
+            Ok(parsed_version) => {
+                let gameversion = GameVersion::local(parsed_version, &version.path());
+
+                gameversions.push(gameversion);
+                debug!("Found game version: {}", version.file_name().display());
+            }
+            Err(e) => {
+                error!("Failed to parse a folder in the installations directory: {e:?}");
+            }
+        }
+    }
+
+    Ok(gameversions)
 }
 
 fn sort_newest_first(versions: &mut [GameVersion]) {
     versions.sort_by(|a, b| b.version.cmp(&a.version));
 }
 
-async fn get_versions_from_api(versions_path: PathBuf) -> Result<Vec<GameVersion>, VersionsError> {
+async fn get_versions_from_api(
+    versions_path: PathBuf,
+    installations_path: PathBuf,
+) -> Result<Vec<GameVersion>, VersionsError> {
     let response = reqwest::get(VSAPI_VERSIONS).await?;
 
     let parsed_response = response.json::<HashMap<String, VSAPIVersion>>().await?;
-    let mut gameversions: Vec<GameVersion> = parsed_response
+    let gameversions: Vec<GameVersion> = parsed_response
         .into_iter()
         .filter_map(|(key, item)| match semver::Version::from_str(&key) {
             Ok(version) => {
@@ -125,35 +143,44 @@ async fn get_versions_from_api(versions_path: PathBuf) -> Result<Vec<GameVersion
             }
         })
         .collect();
+
+    let mut gameversions =
+        merge_versions(load_local_versions(installations_path).await?, gameversions);
     sort_newest_first(&mut gameversions);
 
     let gameversion_store = GameVersionStore {
         gameversions: gameversions.clone(),
     };
 
-    let mut versions_toml = File::create(versions_path)?;
-    versions_toml.write_all((toml::to_string(&gameversion_store)?).as_bytes())?;
+    let mut versions_toml = tokio::fs::File::create(versions_path).await?;
+    versions_toml
+        .write_all((toml::to_string(&gameversion_store)?).as_bytes())
+        .await?;
     Ok(gameversions)
 }
-pub async fn refresh_versions() -> Result<Vec<GameVersion>, VersionsError> {
+pub async fn refresh_versions(
+    installations_path: PathBuf,
+) -> Result<Vec<GameVersion>, VersionsError> {
     let cache_dir = paths::cache_dir()?;
-    fs::create_dir_all(&cache_dir)?;
+    tokio::fs::create_dir_all(&cache_dir).await?;
 
-    get_versions_from_api(cache_dir.join("versions.toml")).await
+    get_versions_from_api(cache_dir.join("versions.toml"), installations_path).await
 }
 
-pub async fn load_versions() -> Result<Vec<GameVersion>, VersionsError> {
+pub async fn load_versions(installations_path: PathBuf) -> Result<Vec<GameVersion>, VersionsError> {
     let cache_dir = paths::cache_dir()?;
-    fs::create_dir_all(&cache_dir)?;
+    tokio::fs::create_dir_all(&cache_dir).await?;
 
     let mut gameversions: Vec<GameVersion> = vec![];
-    if let Ok(versions_toml) = fs::read_to_string(cache_dir.join("versions.toml")) {
+    if let Ok(versions_toml) = tokio::fs::read_to_string(cache_dir.join("versions.toml")).await {
         let gameversion_store =
             toml::from_str::<GameVersionStore>(&versions_toml).unwrap_or(GameVersionStore::empty());
         gameversions.extend(gameversion_store.gameversions);
     }
     if gameversions.is_empty() {
-        gameversions.extend(get_versions_from_api(cache_dir.join("versions.toml")).await?);
+        gameversions.extend(
+            get_versions_from_api(cache_dir.join("versions.toml"), installations_path).await?,
+        );
     };
 
     Ok(gameversions)
@@ -175,7 +202,7 @@ pub async fn download_version(
     if let GameVersionSource::Remote(remote_mod) = &gameversion.source {
         let cache_dir = paths::cache_dir()?;
         let temp_download_path = cache_dir.join(gameversion.version.to_string());
-        fs::create_dir_all(&temp_download_path)?;
+        tokio::fs::create_dir_all(&temp_download_path).await?;
 
         let temp_file_path = temp_download_path.join(&remote_mod.filename);
         let mut temp_file = tokio::fs::File::create(&temp_file_path).await?;
