@@ -11,16 +11,18 @@ opt-level = 2
 
 [dependencies]
 directories = "6.0.0"
-iced = { version = "0.14.0", features = ["image", "selector", "debug", "advanced", "lazy", "tokio", "wgpu"] }
+iced = { version = "0.14.0", features = ["image", "selector", "debug", "advanced", "lazy", "tokio", "wgpu", "sipper"] }
 iced_aw = { version = "0.14.0", features = ["full"] }
 # iced_webview_v2 = { git = "https://github.com/franzos/iced_webview_v2", default-features = false, features = ["blitz", "litehtml"] }  # or "cef"
 iced_blitzview = { path = "crates/iced_blitzview"}
 image = "0.25.6"
-reqwest = { version = "0.13.4", features = ["json"] }
+reqwest = { version = "0.13.4", features = ["json", "stream"] }
 semver = "1.0.28"
 serde = "1.0.228"
 serde_json = "1.0.150"
+sipper = "0.1.0"
 thiserror = "2.0.18"
+tokio = { version = "1.52.3", features = ["fs", "process"] }
 toml = "1.1.2"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

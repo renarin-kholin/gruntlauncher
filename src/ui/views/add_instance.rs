@@ -1,29 +1,40 @@
+use std::path::PathBuf;
+
 use iced::{
     Element,
     Length::{self, Fill, Shrink},
     Task,
     alignment::{Horizontal, Vertical},
     padding,
+    task::{Straw, sipper},
     widget::{
-        button, center, column, container, image, right_center, row, rule, scrollable, text,
-        text_input,
+        button, center, column, container, image, progress_bar, right_center, row, rule,
+        scrollable, text, text_input,
     },
 };
 use iced_aw::spinner;
 use iced_blitzview::web_view;
-use tracing::error;
-use uuid::Uuid;
+use tracing::{debug, error};
 
 use crate::{
     core::{
         instance::GruntInstance,
         version::{GameVersion, VersionCatalog},
     },
-    services::version::{VersionsError, load_versions, refresh_versions},
+    services::{
+        instance::{self, InstancesError},
+        version::{
+            InstallProgress, VersionsError, download_version, extract_archive, load_versions,
+            refresh_versions,
+        },
+    },
     ui::{
         GruntAction, GruntState,
         views::ScreenOutput,
-        widget::table::{self, TableColumn},
+        widget::{
+            overlay::overlay_container,
+            table::{self, TableColumn},
+        },
     },
 };
 
@@ -49,19 +60,18 @@ impl Step {
         }
     }
 }
-#[derive(Clone)]
 pub struct Screen {
-    instance: GruntInstance,
+    name: String,
+    selected_version: Option<GameVersion>,
     columns: Vec<TableColumn>,
     rows: Vec<Vec<String>>,
     step: Step,
     selected_mod: Option<usize>,
+    install_progress: InstallProgress,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ScreenLoaded,
-
     NameChanged(String),
     SelectMod(usize),
     SelectVersion(usize),
@@ -76,25 +86,19 @@ pub enum Message {
     //Webview events
     ModViewPageFetched(Result<String, String>),
 
+    //Service Result events
     VersionsLoaded(Result<Vec<GameVersion>, VersionsError>),
-}
+    VersionInstalling(InstallProgress),
+    VersionInstalled(Result<PathBuf, VersionsError>),
 
-impl Default for Screen {
-    fn default() -> Self {
-        Self::new()
-    }
+    InstanceCreated(Result<GruntInstance, InstancesError>),
 }
 
 impl Screen {
-    pub fn new() -> Self {
-        Self {
-            instance: GruntInstance {
-                name: String::from(""),
-                id: Uuid::new_v4(),
-                mods: vec![],
-                version: GameVersion::default(),
-            },
-
+    pub fn new(state: &mut GruntState) -> (Self, Task<Message>) {
+        let mut screen = Self {
+            name: String::new(),
+            selected_version: None,
             columns: vec![
                 TableColumn::new("Version", 150.0).min_width(80.0),
                 TableColumn::new("Type", 300.0).min_width(80.0),
@@ -102,7 +106,29 @@ impl Screen {
             rows: vec![],
             step: Step::Basic,
             selected_mod: None,
-        }
+            install_progress: InstallProgress::NotStarted,
+        };
+
+        // Reuse an already-loaded catalog; otherwise kick off a load.
+        let task = match &state.vs_versions {
+            VersionCatalog::Loaded { versions } => {
+                screen.rows = Self::version_rows(versions);
+                Task::none()
+            }
+            _ => {
+                state.vs_versions.loading();
+                Task::perform(load_versions(), Message::VersionsLoaded)
+            }
+        };
+
+        (screen, task)
+    }
+
+    fn version_rows(versions: &[GameVersion]) -> Vec<Vec<String>> {
+        versions
+            .iter()
+            .map(|v| vec![v.version.to_string(), "Release".to_string()])
+            .collect()
     }
 
     fn view_basic<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
@@ -149,7 +175,7 @@ impl Screen {
                 button(image("assets/icons/logo.png").height(50.0).width(50.0)).style(button::text),
                 column![
                     text!("Instance Name "),
-                    text_input("Default name", &self.instance.name).on_input(NameChanged)
+                    text_input("Default name", &self.name).on_input(NameChanged)
                 ]
                 .spacing(5.0)
             ]
@@ -203,17 +229,36 @@ impl Screen {
         ]
         .into()
     }
+    fn view_progress_overlay(&self) -> Element<'_, Message> {
+        use InstallProgress::*;
+
+        let main_container = column![].spacing(10.0).padding(10.0);
+        match self.install_progress {
+            NotStarted => main_container.push(text!("Starting download please wait...")),
+            Downloading { downloaded, total } => main_container
+                .push(text!("Downloading game file"))
+                .push(progress_bar(0.0..=(total as f32), downloaded as f32)),
+            _ => main_container.push(text!("Not implemented yet.")),
+        }
+        .into()
+    }
     fn view_review(&self) -> Element<'_, Message> {
         use Message::*;
 
-        column![
+        let base = column![
             //Instance details (name and icon)
             row![
                 button(image("assets/icons/logo.png").height(50.0).width(50.0)).style(button::text),
                 column![
                     text!("Instance Name "),
-                    text!("{}", &self.instance.name),
-                    text!("{}", &self.instance.version.version.to_string())
+                    text!("{}", &self.name),
+                    text!(
+                        "{}",
+                        self.selected_version
+                            .as_ref()
+                            .map(|v| v.version.to_string())
+                            .unwrap_or_else(|| "No version selected".to_string())
+                    )
                 ]
                 .spacing(5.0)
             ]
@@ -245,8 +290,13 @@ impl Screen {
             )
             .height(Length::Shrink)
         ]
-        .spacing(10.0)
-        .into()
+        .spacing(10.0);
+        let child = if matches!(self.install_progress, InstallProgress::NotStarted) {
+            None
+        } else {
+            Some(self.view_progress_overlay())
+        };
+        overlay_container(base.into(), child, Some("Adding instance".into()))
     }
     fn mod_item(&self, i: usize) -> Element<'_, Message> {
         use Message::*;
@@ -408,25 +458,9 @@ impl Screen {
         use Message::*;
 
         match message {
-            //First message received when screen is opened
-            ScreenLoaded => {
-                if let VersionCatalog::Loaded { versions } = &state.vs_versions {
-                    self.rows = versions
-                        .iter()
-                        .map(|v| vec![v.version.to_string(), "Release".to_string()])
-                        .collect::<Vec<_>>();
-                    ScreenOutput::none()
-                } else {
-                    state.vs_versions.loading();
-                    ScreenOutput::task(Task::perform(
-                        async move { load_versions().await },
-                        Message::VersionsLoaded,
-                    ))
-                }
-            }
             Cancel => ScreenOutput::action(CloseScreen),
             NameChanged(name) => {
-                self.instance.name = name;
+                self.name = name;
                 ScreenOutput::none()
             }
             Navigate(step) => {
@@ -443,7 +477,7 @@ impl Screen {
             }
             SelectVersion(i) => {
                 if let VersionCatalog::Loaded { versions } = &state.vs_versions {
-                    self.instance.version = versions[i].clone();
+                    self.selected_version = versions.get(i).cloned();
                 }
                 ScreenOutput::none()
             }
@@ -459,24 +493,73 @@ impl Screen {
                 ))
             }
             VersionsLoaded(loaded_result) => {
-                if let Ok(gv) = loaded_result {
-                    state.vs_versions.load(gv);
-                    self.rows = if let VersionCatalog::Loaded { versions } = &state.vs_versions {
-                        versions
-                            .iter()
-                            .map(|v| vec![v.version.to_string(), "Release".to_string()])
-                            .collect::<Vec<_>>()
-                    } else {
-                        vec![]
-                    };
-                } else {
-                    error!("{:?}", loaded_result);
+                match loaded_result {
+                    Ok(gv) => {
+                        state.vs_versions.load(gv);
+                        if let VersionCatalog::Loaded { versions } = &state.vs_versions {
+                            self.rows = Self::version_rows(versions);
+                        }
+                    }
+                    Err(e) => {
+                        state.vs_versions.failed();
+                        error!("Failed to load versions: {e:?}");
+                    }
                 }
                 ScreenOutput::none()
             }
             Message::CreateInstance => {
-                ScreenOutput::action(GruntAction::CreateInstance(self.instance.clone()))
-                    .action_add(CloseScreen)
+                let Some(version) = self.selected_version.clone() else {
+                    // No version selected yet — form validation will surface this later.
+                    return ScreenOutput::none();
+                };
+                if let Some(config) = &state.config {
+                    // TODO(#1): persist the instance (GruntAction::CreateInstance) once the
+                    // download/extract flow is wired up.
+                    let (task, _handle) = Task::sip(
+                        Self::install_version(version, config.installations_folder.clone()),
+                        VersionInstalling,
+                        VersionInstalled,
+                    )
+                    .abortable();
+                    ScreenOutput::task(task)
+                } else {
+                    ScreenOutput::none()
+                }
+            }
+            VersionInstalled(result) => {
+                debug!("{:?}", result);
+                if let (Ok(installled_path), Some(config), Some(version)) =
+                    (result, state.config.clone(), self.selected_version.clone())
+                {
+                    let version = version.to_local(&installled_path);
+                    let name = self.name.clone();
+                    return ScreenOutput::task(Task::perform(
+                        async move {
+                            instance::add_instance(
+                                GruntInstance {
+                                    name,
+                                    id: uuid::Uuid::new_v4(),
+                                    mods: vec![],
+                                    version,
+                                },
+                                &config.instances_folder,
+                            )
+                        },
+                        InstanceCreated,
+                    ));
+                }
+                ScreenOutput::none()
+            }
+            InstanceCreated(result) => {
+                if let Ok(instance) = result {
+                    return ScreenOutput::action(GruntAction::CreateInstance(instance))
+                        .action_add(CloseScreen);
+                }
+                ScreenOutput::none()
+            }
+            VersionInstalling(progress) => {
+                self.install_progress = progress;
+                ScreenOutput::none()
             }
             ModViewPageFetched(Ok(page)) => {
                 state.webview_content.load_html(&page);
@@ -488,5 +571,20 @@ impl Screen {
             }
             _ => ScreenOutput::none(),
         }
+    }
+    pub fn install_version(
+        version: GameVersion,
+        install_dir: PathBuf,
+    ) -> impl Straw<PathBuf, InstallProgress, VersionsError> {
+        sipper(async move |mut progress| {
+            let archive_path = download_version(version.clone(), &mut progress).await?;
+            let mut install_path = PathBuf::new();
+            if let Some(archive_path) = archive_path {
+                install_path =
+                    extract_archive(version, archive_path, install_dir, &mut progress).await?;
+            }
+            progress.send(InstallProgress::Done).await;
+            Ok(install_path)
+        })
     }
 }

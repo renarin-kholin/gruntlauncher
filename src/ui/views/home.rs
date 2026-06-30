@@ -1,24 +1,18 @@
 use iced::{
-    Element, Length,
+    Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{self, button, column, image::Handle, row, rule, scrollable, text},
 };
+use tracing::debug;
 
 use crate::{
     assets::GRUNT_ICON,
-    core::{
-        instance::{GruntInstance, InstanceId},
-        version::GameVersion,
-    },
-    services::version::VersionsError,
-    ui::{
-        GruntAction, GruntState,
-        views::{self, ScreenOutput, add_instance},
-    },
+    core::instance::{GruntInstance, InstanceId},
+    services::instance::{self, InstancesError},
+    ui::{GruntAction, GruntState, views::ScreenOutput},
 };
 
-#[derive(Clone)]
 pub struct Screen {
     selected_instance: Option<InstanceId>,
     icon_handles: Vec<Handle>,
@@ -27,8 +21,9 @@ pub struct Screen {
 #[derive(Debug, Clone)]
 pub enum Message {
     SelectInstance(InstanceId),
+    LaunchInstance,
+    InstanceLaunched(Result<(), InstancesError>),
     AddInstance,
-    VersionsLoaded(Result<Vec<GameVersion>, VersionsError>),
 }
 
 impl Default for Screen {
@@ -104,7 +99,15 @@ impl Screen {
                 //Sidebar
                 column![
                     text("Selected instance"),
-                    button("Launch").padding(padding::horizontal(30.0).vertical(7.0))
+                    button("Launch")
+                        .padding(padding::horizontal(30.0).vertical(7.0))
+                        .style(move |theme, mut status| {
+                            if self.selected_instance.is_none() {
+                                status = button::Status::Disabled;
+                            }
+                            button::primary(theme, status)
+                        })
+                        .on_press(Message::LaunchInstance)
                 ]
                 .align_x(Horizontal::Center)
                 .width(Length::FillPortion(1))
@@ -118,19 +121,32 @@ impl Screen {
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
+        use Message::*;
         match message {
-            Message::AddInstance => {
-                return ScreenOutput::action(SwitchScreen(views::Screen::AddInstance(
-                    add_instance::Screen::new(),
-                )));
+            AddInstance => {
+                return ScreenOutput::action(OpenAddInstance);
             }
-            Message::SelectInstance(id) => {
+            SelectInstance(id) => {
                 self.selected_instance = Some(id);
             }
-            Message::VersionsLoaded(Ok(gv)) => {
-                state.vs_versions.load(gv);
+            LaunchInstance => {
+                if let (Some(selected_instance), Some(config)) =
+                    (self.selected_instance, state.config.clone())
+                {
+                    let instance = state
+                        .instances
+                        .iter()
+                        .find(|i| i.id == selected_instance)
+                        .expect("Could not select instance");
+                    return ScreenOutput::task(Task::perform(
+                        instance::launch_instance(instance.clone(), config.instances_folder),
+                        InstanceLaunched,
+                    ));
+                }
             }
-            _ => {}
+            InstanceLaunched(result) => {
+                debug!("{result:?}");
+            }
         }
         ScreenOutput::none()
     }
