@@ -67,6 +67,10 @@ impl<'a, Message> Table<'a, Message> {
         self
     }
 }
+const SCROLLBAR_W: f32 = 6.0;
+const SCROLLBAR_PAD: f32 = 2.0;
+const MIN_THUMB_H: f32 = 24.0;
+
 #[derive(Clone)]
 struct TableState {
     column_widths: Vec<f32>,
@@ -74,6 +78,8 @@ struct TableState {
     hovered_row: Option<usize>,
     hovered_divider: Option<usize>,
     resizing: Option<ColumnResize>,
+    scroll: f32,
+    scrollbar_drag: Option<f32>,
 }
 impl TableState {
     pub fn new() -> Self {
@@ -83,6 +89,8 @@ impl TableState {
             hovered_row: None,
             hovered_divider: None,
             resizing: None,
+            scroll: 0.0,
+            scrollbar_drag: None,
         }
     }
     pub fn init(&self, columns: &[TableColumn]) -> Self {
@@ -130,25 +138,28 @@ where
         theme: &iced::Theme,
         _style: &renderer::Style,
         layout: iced::advanced::Layout<'_>,
-        _cursor: iced::advanced::mouse::Cursor,
+        cursor: iced::advanced::mouse::Cursor,
         _viewport: &iced::Rectangle,
     ) {
         let state = tree.state.downcast_ref::<TableState>();
         let bounds = layout.bounds();
 
-        let widths = effective_widths(bounds, &state.column_widths);
+        let widths = effective_widths(
+            bounds,
+            &state.column_widths,
+            self.columns.last().map_or(0.0, |c| c.min_width),
+        );
         let col_xs = col_start_xs(bounds, &widths);
         let div_xs = divider_xs(bounds, &widths);
-        let total_h = self.header_height + self.rows.len() as f32 * self.row_height;
+        let body = body_bounds(bounds, self.header_height);
+        let scroll = state.scroll.clamp(
+            0.0,
+            max_scroll(bounds, self.header_height, self.row_height, self.rows.len()),
+        );
 
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
-                // border: Border {
-                //     width: 4.0,
-                //     color: theme.extended_palette().primary.base.color,
-                //     ..Default::default()
-                // },
                 ..renderer::Quad::default()
             },
             theme.palette().background,
@@ -197,87 +208,119 @@ where
             },
             theme.extended_palette().background.strongest.color,
         );
-        for (row_idx, row) in self.rows.iter().enumerate() {
-            let row_y = bounds.y + self.header_height + row_idx as f32 * self.row_height;
-            let row_bg = if state.selected_row == Some(row_idx) {
-                theme.extended_palette().background.stronger
-            } else if state.hovered_row == Some(row_idx) {
-                theme.extended_palette().background.weaker
-            } else if row_idx % 2 == 0 {
-                theme.extended_palette().background.weakest
-            } else {
-                theme.extended_palette().background.base
-            };
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: Rectangle {
-                        x: bounds.x,
-                        y: row_y,
-                        width: bounds.width,
-                        height: self.row_height,
-                    },
-                    ..Default::default()
-                },
-                row_bg.color,
-            );
-            for (col_idx, cell_text) in row.iter().take(self.columns.len()).enumerate() {
-                let cell = Rectangle {
-                    x: col_xs[col_idx],
-                    y: row_y,
-                    width: widths[col_idx],
-                    height: self.row_height,
+        renderer.with_layer(body, |renderer| {
+            for (row_idx, row) in self.rows.iter().enumerate() {
+                let row_y = body.y + row_idx as f32 * self.row_height - scroll;
+                if row_y + self.row_height < body.y || row_y > body.y + body.height {
+                    continue;
+                }
+                let row_bg = if state.selected_row == Some(row_idx) {
+                    theme.extended_palette().background.stronger
+                } else if state.hovered_row == Some(row_idx) {
+                    theme.extended_palette().background.weaker
+                } else if row_idx % 2 == 0 {
+                    theme.extended_palette().background.weakest
+                } else {
+                    theme.extended_palette().background.base
                 };
-                renderer.fill_text(
-                    text::Text {
-                        content: cell_text.clone(),
-                        bounds: Size::new(cell.width - 16.0, self.row_height),
-                        size: Pixels(13.0),
-                        line_height: text::LineHeight::default(),
-                        font: renderer.default_font(),
-                        align_x: Horizontal::Left.into(),
-                        align_y: Vertical::Center,
-                        shaping: text::Shaping::Auto,
-                        wrapping: text::Wrapping::None,
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: Rectangle {
+                            x: bounds.x,
+                            y: row_y,
+                            width: bounds.width,
+                            height: self.row_height,
+                        },
+                        ..Default::default()
                     },
-                    Point::new(cell.x + 8.0, row_y + self.row_height / 2.0),
-                    row_bg.text,
-                    cell,
+                    row_bg.color,
+                );
+                for (col_idx, cell_text) in row.iter().take(self.columns.len()).enumerate() {
+                    let cell = Rectangle {
+                        x: col_xs[col_idx],
+                        y: row_y,
+                        width: widths[col_idx],
+                        height: self.row_height,
+                    };
+                    renderer.fill_text(
+                        text::Text {
+                            content: cell_text.clone(),
+                            bounds: Size::new(cell.width - 16.0, self.row_height),
+                            size: Pixels(13.0),
+                            line_height: text::LineHeight::default(),
+                            font: renderer.default_font(),
+                            align_x: Horizontal::Left.into(),
+                            align_y: Vertical::Center,
+                            shaping: text::Shaping::Auto,
+                            wrapping: text::Wrapping::None,
+                        },
+                        Point::new(cell.x + 8.0, row_y + self.row_height / 2.0),
+                        row_bg.text,
+                        cell,
+                    );
+                }
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: Rectangle {
+                            x: bounds.x,
+                            y: row_y + self.row_height - 0.5,
+                            width: bounds.width,
+                            height: 0.5,
+                        },
+                        ..Default::default()
+                    },
+                    theme.extended_palette().background.weak.color,
                 );
             }
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: Rectangle {
-                        x: bounds.x,
-                        y: row_y + self.row_height - 0.5,
-                        width: bounds.width,
-                        height: 0.5,
+        });
+        renderer.with_layer(bounds, |renderer| {
+            for (i, &div_x) in div_xs.iter().enumerate() {
+                let is_active = state.hovered_divider == Some(i)
+                    || state.resizing.as_ref().is_some_and(|r| r.column_index == i);
+                let color = if is_active {
+                    theme.extended_palette().background.stronger.color
+                } else {
+                    theme.extended_palette().background.strong.color
+                };
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: Rectangle {
+                            x: div_x - if is_active { 3.0 } else { 1.0 },
+                            y: bounds.y,
+                            width: if is_active { 6.0 } else { 2.0 },
+                            height: bounds.height,
+                        },
+                        ..Default::default()
                     },
-                    ..Default::default()
-                },
-                theme.extended_palette().background.weak.color,
-            );
-        }
-        for (i, &div_x) in div_xs.iter().enumerate() {
-            let is_active = state.hovered_divider == Some(i)
-                || state.resizing.as_ref().is_some_and(|r| r.column_index == i);
-            let color = if is_active {
-                theme.extended_palette().background.stronger.color
-            } else {
-                theme.extended_palette().background.strong.color
-            };
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: Rectangle {
-                        x: div_x - if is_active { 3.0 } else { 1.0 },
-                        y: bounds.y,
-                        width: if is_active { 6.0 } else { 2.0 },
-                        height: total_h,
+                    color,
+                );
+            }
+            if let Some(thumb) = thumb_bounds(
+                bounds,
+                self.header_height,
+                self.row_height,
+                self.rows.len(),
+                scroll,
+            ) {
+                let is_active = state.scrollbar_drag.is_some()
+                    || cursor.position().is_some_and(|p| thumb.contains(p));
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: thumb,
+                        border: iced::Border {
+                            radius: (SCROLLBAR_W / 2.0).into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
                     },
-                    ..Default::default()
-                },
-                color,
-            );
-        }
+                    if is_active {
+                        theme.extended_palette().background.stronger.color
+                    } else {
+                        theme.extended_palette().background.strong.color
+                    },
+                );
+            }
+        });
     }
     fn layout(
         &mut self,
@@ -311,17 +354,53 @@ where
         let bounds = layout.bounds();
         let state = tree.state.downcast_mut::<TableState>();
 
-        let widths = effective_widths(bounds, &state.column_widths);
+        let widths = effective_widths(
+            bounds,
+            &state.column_widths,
+            self.columns.last().map_or(0.0, |c| c.min_width),
+        );
         let div_xs = divider_xs(bounds, &widths);
+
+        let n_rows = self.rows.len();
+        let scroll_limit = max_scroll(bounds, self.header_height, self.row_height, n_rows);
+        state.scroll = state.scroll.clamp(0.0, scroll_limit);
+        let thumb = thumb_bounds(
+            bounds,
+            self.header_height,
+            self.row_height,
+            n_rows,
+            state.scroll,
+        );
 
         match mouse_event {
             mouse::Event::CursorMoved { .. } => {
                 let Some(pos) = cursor.position() else { return };
-                if let Some(ref resize) = state.resizing.clone() {
+                if let Some(grab) = state.scrollbar_drag {
+                    let body = body_bounds(bounds, self.header_height);
+                    if let Some(thumb) = thumb {
+                        let track_h = body.height - 2.0 * SCROLLBAR_PAD;
+                        let range = track_h - thumb.height;
+                        if range > 0.0 {
+                            let progress = (pos.y - grab - (body.y + SCROLLBAR_PAD)) / range;
+                            state.scroll = (progress * scroll_limit).clamp(0.0, scroll_limit);
+                        }
+                    }
+                    shell.capture_event();
+                    shell.request_redraw();
+                } else if let Some(ref resize) = state.resizing.clone() {
                     let delta = pos.x - resize.start_cursor_x;
                     let min_w = self.columns[resize.column_index].min_width;
+                    let n = state.column_widths.len();
+                    let others: f32 = state.column_widths[..n - 1]
+                        .iter()
+                        .enumerate()
+                        .filter(|(j, _)| *j != resize.column_index)
+                        .map(|(_, w)| w)
+                        .sum();
+                    let last_min = self.columns.last().map_or(0.0, |c| c.min_width);
+                    let max_w = (bounds.width - others - last_min).max(min_w);
                     state.column_widths[resize.column_index] =
-                        (resize.start_width + delta).max(min_w);
+                        (resize.start_width + delta).clamp(min_w, max_w);
                     state.hovered_divider = Some(resize.column_index);
                     shell.capture_event();
                     shell.request_redraw();
@@ -331,7 +410,8 @@ where
                         bounds,
                         self.header_height,
                         self.row_height,
-                        self.rows.len(),
+                        n_rows,
+                        state.scroll,
                     );
                     let new_div = hit_divider(pos, &div_xs, bounds, self.divider_grab_width);
                     let changed = new_row != state.hovered_row || new_div != state.hovered_divider;
@@ -343,12 +423,38 @@ where
                     }
                 }
             }
+            mouse::Event::WheelScrolled { delta } => {
+                let Some(pos) = cursor.position() else { return };
+                if scroll_limit > 0.0 && bounds.contains(pos) {
+                    let dy = match delta {
+                        mouse::ScrollDelta::Lines { y, .. } => y * self.row_height * 1.5,
+                        mouse::ScrollDelta::Pixels { y, .. } => *y,
+                    };
+                    state.scroll = (state.scroll - dy).clamp(0.0, scroll_limit);
+                    state.hovered_row = hit_row(
+                        pos,
+                        bounds,
+                        self.header_height,
+                        self.row_height,
+                        n_rows,
+                        state.scroll,
+                    );
+                    shell.capture_event();
+                    shell.request_redraw();
+                }
+            }
             mouse::Event::ButtonPressed(mouse::Button::Left) => {
                 let Some(pos) = cursor.position() else { return };
                 if !bounds.contains(pos) {
                     return;
                 }
-                if let Some(div_idx) = hit_divider(pos, &div_xs, bounds, self.divider_grab_width) {
+                if let Some(thumb) = thumb.filter(|t| t.contains(pos)) {
+                    state.scrollbar_drag = Some(pos.y - thumb.y);
+                    shell.capture_event();
+                    shell.request_redraw();
+                } else if let Some(div_idx) =
+                    hit_divider(pos, &div_xs, bounds, self.divider_grab_width)
+                {
                     state.resizing = Some(ColumnResize {
                         column_index: div_idx,
                         start_cursor_x: pos.x,
@@ -361,7 +467,8 @@ where
                     bounds,
                     self.header_height,
                     self.row_height,
-                    self.rows.len(),
+                    n_rows,
+                    state.scroll,
                 ) {
                     state.selected_row = Some(row);
                     if let Some(ref on_select) = self.on_select {
@@ -372,7 +479,7 @@ where
                 }
             }
             mouse::Event::ButtonReleased(mouse::Button::Left)
-                if state.resizing.take().is_some() =>
+                if state.resizing.take().is_some() || state.scrollbar_drag.take().is_some() =>
             {
                 shell.capture_event();
                 shell.request_redraw();
@@ -407,17 +514,16 @@ where
     }
 }
 
-fn effective_widths(bounds: Rectangle, col_widths: &[f32]) -> Vec<f32> {
+fn effective_widths(bounds: Rectangle, col_widths: &[f32], last_min: f32) -> Vec<f32> {
     let n = col_widths.len();
     if n == 0 {
         return vec![];
     };
     let mut widths = col_widths.to_vec();
     let sum_except_last: f32 = widths[..n - 1].iter().sum();
-    widths[n - 1] = (bounds.width - sum_except_last).max(widths[n - 1]);
+    widths[n - 1] = (bounds.width - sum_except_last).max(last_min);
     widths
 }
-//X pos for pixels where the column starts
 fn col_start_xs(bounds: Rectangle, widths: &[f32]) -> Vec<f32> {
     let mut x = bounds.x;
     widths
@@ -429,7 +535,6 @@ fn col_start_xs(bounds: Rectangle, widths: &[f32]) -> Vec<f32> {
         })
         .collect()
 }
-//X pos for divider of a column
 fn divider_xs(bounds: Rectangle, widths: &[f32]) -> Vec<f32> {
     let mut x = bounds.x;
     widths
@@ -441,18 +546,54 @@ fn divider_xs(bounds: Rectangle, widths: &[f32]) -> Vec<f32> {
         })
         .collect()
 }
-//Which row is the pos at
+fn body_bounds(bounds: Rectangle, header_h: f32) -> Rectangle {
+    Rectangle {
+        y: bounds.y + header_h,
+        height: (bounds.height - header_h).max(0.0),
+        ..bounds
+    }
+}
+
+fn max_scroll(bounds: Rectangle, header_h: f32, row_h: f32, n_rows: usize) -> f32 {
+    (n_rows as f32 * row_h - body_bounds(bounds, header_h).height).max(0.0)
+}
+
+fn thumb_bounds(
+    bounds: Rectangle,
+    header_h: f32,
+    row_h: f32,
+    n_rows: usize,
+    scroll: f32,
+) -> Option<Rectangle> {
+    let body = body_bounds(bounds, header_h);
+    let content_h = n_rows as f32 * row_h;
+    if content_h <= body.height {
+        return None;
+    }
+    let track_h = body.height - 2.0 * SCROLLBAR_PAD;
+    let thumb_h = (track_h * body.height / content_h).max(MIN_THUMB_H);
+    let progress = (scroll / (content_h - body.height)).clamp(0.0, 1.0);
+    Some(Rectangle {
+        x: bounds.x + bounds.width - SCROLLBAR_PAD - SCROLLBAR_W,
+        y: body.y + SCROLLBAR_PAD + progress * (track_h - thumb_h),
+        width: SCROLLBAR_W,
+        height: thumb_h,
+    })
+}
+
 fn hit_row(
     pos: Point,
     bounds: Rectangle,
     header_h: f32,
     row_h: f32,
     n_rows: usize,
+    scroll: f32,
 ) -> Option<usize> {
-    if pos.x < bounds.x || pos.x > bounds.x + bounds.width {
+    let body = body_bounds(bounds, header_h);
+    if !body.contains(pos) {
         return None;
     }
-    let rel_y = pos.y - (bounds.y + header_h);
+    let rel_y = pos.y - body.y + scroll;
     if rel_y < 0.0 {
         return None;
     }
@@ -468,11 +609,3 @@ fn hit_divider(pos: Point, div_xs: &[f32], bounds: Rectangle, grab_w: f32) -> Op
         .iter()
         .position(|&dx| (pos.x - dx).abs() <= grab_w / 2.0)
 }
-// impl<'a, Message: 'a, Renderer> From<Table<'a, Message>>
-//     for Element<'a, Message, iced::Theme, Renderer>
-// where
-//     Renderer: renderer::Renderer,
-// {
-//     fn from(table: Table<'a, Message>) -> Self {
-//     }
-// }

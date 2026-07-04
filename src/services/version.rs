@@ -11,6 +11,7 @@ use crate::{
     assets::VSAPI_VERSIONS,
     core::version::{GameVersion, GameVersionSource, merge_versions},
     paths::{self, ProjectDirError},
+    services::HTTP,
 };
 
 #[derive(Deserialize, Debug)]
@@ -123,7 +124,7 @@ async fn get_versions_from_api(
     versions_path: PathBuf,
     installations_path: PathBuf,
 ) -> Result<Vec<GameVersion>, VersionsError> {
-    let response = reqwest::get(VSAPI_VERSIONS).await?;
+    let response = HTTP.get(VSAPI_VERSIONS).send().await?;
 
     let parsed_response = response.json::<HashMap<String, VSAPIVersion>>().await?;
     let gameversions: Vec<GameVersion> = parsed_response
@@ -206,7 +207,7 @@ pub async fn download_version(
 
         let temp_file_path = temp_download_path.join(&remote_mod.filename);
         let mut temp_file = tokio::fs::File::create(&temp_file_path).await?;
-        let response = reqwest::get(&remote_mod.url).await?;
+        let response = HTTP.get(&remote_mod.url).send().await?;
         let total = response
             .content_length()
             .ok_or(VersionsError::NoContentLength)?;

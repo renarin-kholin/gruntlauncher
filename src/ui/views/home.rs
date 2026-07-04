@@ -130,16 +130,17 @@ impl Screen {
                 self.selected_instance = Some(id);
             }
             LaunchInstance => {
-                if let (Some(selected_instance), Some(config)) =
-                    (self.selected_instance, state.config.clone())
-                {
+                if let Some(selected_instance) = self.selected_instance {
                     let instance = state
                         .instances
                         .iter()
                         .find(|i| i.id == selected_instance)
                         .expect("Could not select instance");
                     return ScreenOutput::task(Task::perform(
-                        instance::launch_instance(instance.clone(), config.instances_folder),
+                        instance::launch_instance(
+                            instance.clone(),
+                            state.config.instances_folder.clone(),
+                        ),
                         InstanceLaunched,
                     ));
                 }

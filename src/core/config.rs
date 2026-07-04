@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::paths::{self};
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Account {
     email: String,
@@ -26,5 +28,16 @@ impl Config {
             installations_folder,
             accounts,
         }
+    }
+}
+impl Default for Config {
+    fn default() -> Self {
+        let project_dirs = paths::dirs().expect("Could not fetch default paths.");
+        let data_dir = project_dirs.data_dir();
+        Self::new(
+            data_dir.join("instances"),
+            data_dir.join("installations"),
+            vec![],
+        )
     }
 }

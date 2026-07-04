@@ -86,6 +86,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "allocator-api2"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+
+[[package]]
 name = "android-activity"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,9 +691,9 @@ checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
 [[package]]
 name = "bytes"
-version = "1.11.1"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+checksum = "8ae3f5d315924270530207e2a68396c3cc547f6dca3fbdca317cfb1a51edb593"
 
 [[package]]
 name = "calloop"
@@ -1022,7 +1028,7 @@ checksum = "08bc795bdbccdbd461736fb163930a009da6597b226d6f6fce33e7a8eb6ec519"
 dependencies = [
  "cosmic-text",
  "etagere",
- "lru",
+ "lru 0.16.4",
  "rustc-hash 2.1.2",
  "wgpu",
 ]
@@ -1841,11 +1847,13 @@ checksum = "b40ca9252762c466af32d0b1002e91e4e1bc5398f77455e55474deb466355ff5"
 name = "gruntlauncher"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "directories",
  "iced",
  "iced_aw",
  "iced_blitzview",
  "image",
+ "lru 0.18.0",
  "reqwest",
  "semver",
  "serde",
@@ -1857,6 +1865,7 @@ dependencies = [
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
  "webbrowser",
 ]
@@ -1961,6 +1970,8 @@ version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash 0.2.0",
 ]
 
@@ -2979,6 +2990,15 @@ name = "lru"
 version = "0.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
+
+[[package]]
+name = "lru"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a860605968fce16869fd239cf4237a82f3ac470723415db603b0e8b6c8d4fb9"
+dependencies = [
+ "hashbrown 0.17.1",
+]
 
 [[package]]
 name = "lru-slab"

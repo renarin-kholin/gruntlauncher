@@ -1,13 +1,18 @@
 use iced::{
     Element, Size, Task,
+    widget::image::Handle,
     window::{icon, settings::PlatformSpecific},
 };
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
     core::{config::Config, instance::GruntInstance},
-    services::{config::LoadConfigError, instance::InstancesError},
+    services::{
+        config::LoadConfigError,
+        image::{DecodedImage, ImagesError, load_image},
+        instance::InstancesError,
+    },
     ui::{
         GruntState,
         theme::grunt_theme,
@@ -23,12 +28,15 @@ pub enum GruntMessage {
 
     InstancesLoaded(Result<Vec<GruntInstance>, InstancesError>),
     ConfigLoaded(Result<Config, LoadConfigError>),
+    ImageLoaded(Result<DecodedImage, ImagesError>, i64),
 }
 
 pub enum GruntAction {
     OpenAddInstance,
     CloseScreen,
     CreateInstance(GruntInstance),
+
+    GetImage { id: i64, url: String },
 }
 
 pub struct GruntLauncher {
@@ -70,7 +78,7 @@ impl GruntLauncher {
         match message {
             ConfigLoaded(load_result) => {
                 if let Ok(config) = load_result {
-                    self.state.config = Some(config.clone());
+                    self.state.config = config.clone();
                     return Task::perform(
                         crate::services::instance::load_instances(config.instances_folder),
                         InstancesLoaded,
@@ -82,6 +90,20 @@ impl GruntLauncher {
                 info!("Instances loaded.");
                 if let Ok(instances) = load_result {
                     self.state.instances.extend(instances);
+                }
+                Task::none()
+            }
+            ImageLoaded(result, id) => {
+                match result {
+                    Ok(decoded) => {
+                        self.state.image_cache.push(
+                            id,
+                            Handle::from_rgba(decoded.width, decoded.height, decoded.rgba),
+                        );
+                    }
+                    Err(e) => {
+                        error!("Error while loading image: {:?}", e);
+                    }
                 }
                 Task::none()
             }
@@ -114,6 +136,11 @@ impl GruntLauncher {
             }
             CreateInstance(instance) => {
                 self.state.instances.push(instance);
+            }
+            GetImage { id, url } => {
+                return Task::perform(load_image(url), move |bytes| {
+                    GruntMessage::ImageLoaded(bytes, id)
+                });
             }
         }
         Task::none()
