@@ -1,16 +1,17 @@
+use futures::stream::{self, StreamExt, TryStreamExt};
 use std::{
     cmp::{max, min},
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::PathBuf,
 };
 
 use iced::{
-    Element,
+    Element, Font,
     Length::{self, Fill, Shrink},
     Task,
+    advanced::graphics::core::font,
     alignment::{Horizontal, Vertical},
     padding,
-    task::{Straw, sipper},
     widget::{
         Row, button, center, column, container, image, progress_bar, right, right_center, row,
         rule, scrollable, text, text_input,
@@ -18,19 +19,22 @@ use iced::{
 };
 use iced_aw::spinner;
 use iced_blitzview::web_view;
-use tracing::{debug, error};
+use thiserror::Error;
+use tracing::error;
 
 use crate::{
     assets::GRUNT_ICON,
     core::{
+        game_mod::GameMod,
         instance::GruntInstance,
         version::{GameVersion, GameVersionSource, VersionCatalog},
     },
     services::{
         game_mod::{
-            ModDetail, ModDetailState, ModListEntry, ModSearchState, ModsError, Release,
-            get_compatible_release, get_mod_details, search_mods,
+            ModDetail, ModDetailState, ModDownloadProgress, ModListEntry, ModSearchState,
+            ModsError, Release, download_mod, get_compatible_release, get_mod_details, search_mods,
         },
+        image::{ImagesError, save_image},
         instance::{self, InstancesError},
         version::{
             InstallProgress, VersionsError, download_version, extract_archive, load_versions,
@@ -47,6 +51,8 @@ use crate::{
         },
     },
 };
+use sipper::Sipper;
+use sipper::{Straw, sipper};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
@@ -71,6 +77,7 @@ impl Step {
     }
 }
 pub struct Screen {
+    id: uuid::Uuid,
     name: String,
     selected_version: Option<GameVersion>,
     columns: Vec<TableColumn>,
@@ -86,6 +93,7 @@ pub struct Screen {
     mod_page_size: usize,
     mod_page_index: usize,
     mod_total: usize,
+    mod_download_progress: HashMap<i64, ModDownloadProgress>,
     requested_images: HashSet<i64>,
 }
 #[derive(Debug, Clone)]
@@ -126,8 +134,8 @@ pub enum Message {
 
     //Service Result events
     VersionsLoaded(Result<Vec<GameVersion>, VersionsError>),
-    VersionInstalling(InstallProgress),
-    VersionInstalled(Result<PathBuf, VersionsError>),
+    InstanceInstalling(InstallProgress),
+    InstanceInstalled(Result<(PathBuf, Vec<GameMod>), InstallError>),
     ModSearchFetched(Result<Vec<ModListEntry>, ModsError>),
     ModDetailsFetched(Result<Box<ModDetail>, ModsError>),
     InstanceCreated(Result<GruntInstance, InstancesError>),
@@ -136,6 +144,7 @@ pub enum Message {
 impl Screen {
     pub fn new(state: &mut GruntState) -> (Self, Task<Message>) {
         let mut screen = Self {
+            id: uuid::Uuid::new_v4(),
             name: String::new(),
             selected_version: None,
             columns: vec![
@@ -154,6 +163,7 @@ impl Screen {
             mod_page_index: 0,
             mod_page_size: 50,
             mod_total: 0,
+            mod_download_progress: HashMap::new(),
             requested_images: HashSet::new(),
         };
 
@@ -305,6 +315,39 @@ impl Screen {
             Installing => main_container
                 .push(text!("Installing"))
                 .push(progress_bar(0.0..=100.0, 25.0)),
+            DownloadingMods(..) => {
+                main_container
+                    .push(text!("Downloading Mods..."))
+                    .push(scrollable(column(self.mod_download_progress.iter().map(
+                        |(modid, mp)| {
+                            use ModDownloadProgress::*;
+                            let mut mod_progress = column![];
+                            let selected_mod =
+                                self.selected_mods.iter().find(|m| m.0.modid == *modid);
+                            let mod_name = if let Some(selected_mod) = selected_mod {
+                                selected_mod.0.name.clone()
+                            } else {
+                                "Unknown Mod".to_string()
+                            };
+                            mod_progress = match mp {
+                                Queued => {
+                                    mod_progress.push(text!("{} queued for download.", mod_name))
+                                }
+                                Downloading { downloaded, total } => mod_progress.push(column![
+                                    text!("Downloading {}", mod_name),
+                                    progress_bar(0.0..=(*total as f32), *downloaded as f32)
+                                ]),
+                                Downloaded => mod_progress.push(text!("Downloaded {}", mod_name)),
+                                Failed(err) => mod_progress.push(text!(
+                                    "Failed to download {}: {:?}",
+                                    mod_name,
+                                    err
+                                )),
+                            };
+                            mod_progress.into()
+                        },
+                    ))))
+            }
             Done => main_container.push(text!("Finished installing.")),
             Failed(e) => main_container.push(text!("{}", e)),
         }
@@ -385,8 +428,14 @@ impl Screen {
                 row![
                     container(image(mod_logo).height(50.0).width(50.0))
                         .style(container::bordered_box),
-                    column![text!("{}", moddb_mod.name), text!("{}", moddb_mod.author)]
-                        .spacing(5.0)
+                    column![
+                        text!("{}", moddb_mod.name).font(Font {
+                            weight: font::Weight::Bold,
+                            ..Default::default()
+                        }),
+                        text!("{}", moddb_mod.author)
+                    ]
+                    .spacing(5.0)
                 ]
                 .padding(10.0)
                 .spacing(10.0),
@@ -413,11 +462,13 @@ impl Screen {
         {
             use ModSearchState::*;
             mods_list = match &self.mod_search_results {
-                NotStarted => mods_list,
+                NotStarted => mods_list.push(center(text!("Search results will appear here"))),
                 Loading => mods_list.push(center(spinner::Spinner::new())),
                 Loaded(mods) => {
                     if mods.is_empty() {
-                        mods_list.push(text!("No search results for that query"))
+                        mods_list.push(
+                            container(text!("No search results for that query")).padding(10.0),
+                        )
                     } else {
                         let mods_list = mods_list.push(
                             scrollable(column(
@@ -540,7 +591,7 @@ impl Screen {
                         row![
                             row![
                                 button("Open in default browser")
-                                    .style(button::text)
+                                    .style(button::subtle)
                                     .on_press(OpenInBrowser(page_url))
                             ]
                             .align_y(Vertical::Center)
@@ -759,45 +810,60 @@ impl Screen {
                 // TODO(#1): persist the instance (GruntAction::CreateInstance) once the
                 // download/extract flow is wired up.
                 let (task, _handle) = Task::sip(
-                    Self::install_version(version, state.config.installations_folder.clone()),
-                    VersionInstalling,
-                    VersionInstalled,
+                    Self::install_instance(
+                        version,
+                        self.id,
+                        self.selected_mods.clone(),
+                        state.config.installations_folder.clone(),
+                        state.config.instances_folder.clone(),
+                    ),
+                    InstanceInstalling,
+                    InstanceInstalled,
                 )
                 .abortable();
                 return ScreenOutput::task(task);
             }
-            VersionInstalled(result) => {
-                debug!("{:?}", result);
-                if let (Ok(installled_path), Some(version)) =
-                    (result, self.selected_version.clone())
-                {
+            InstanceInstalled(result) => match (result, &self.selected_version) {
+                (Ok((installled_path, mods)), Some(version)) => {
                     let version = version.to_local(&installled_path);
                     let name = self.name.clone();
                     return ScreenOutput::task(Task::perform(
                         instance::add_instance(
                             GruntInstance {
                                 name,
-                                id: uuid::Uuid::new_v4(),
-                                mods: vec![],
+                                id: self.id,
+                                mods,
                                 version,
                             },
                             state.config.instances_folder.clone(),
                         ),
                         InstanceCreated,
                     ));
-                } else {
-                    return ScreenOutput::none();
                 }
-            }
-            InstanceCreated(result) => {
-                if let Ok(instance) = result {
+                (_, None) => {
+                    error!("Could not load selected version.");
+                }
+                (Err(err), _) => {
+                    error!("Error while trying to install instance: {}", err);
+                }
+            },
+            InstanceCreated(result) => match result {
+                Ok(instance) => {
                     return ScreenOutput::action(GruntAction::CreateInstance(instance))
                         .action_add(CloseScreen);
-                } else {
+                }
+                Err(err) => {
+                    error!("An error occured while creating the instance: {}", err);
                     return ScreenOutput::none();
                 }
-            }
-            VersionInstalling(progress) => {
+            },
+            InstanceInstalling(progress) => {
+                if let InstallProgress::DownloadingMods(modid, ref modprogress) = progress {
+                    self.mod_download_progress
+                        .entry(modid)
+                        .and_modify(|m| *m = modprogress.clone())
+                        .or_insert(modprogress.clone());
+                }
                 self.install_progress = progress;
             }
             OpenInBrowser(url) => {
@@ -859,10 +925,13 @@ impl Screen {
             false
         }
     }
-    pub fn install_version(
+    pub fn install_instance(
         version: GameVersion,
+        id: uuid::Uuid,
+        mods: Vec<(Box<ModDetail>, Release)>,
         install_dir: PathBuf,
-    ) -> impl Straw<PathBuf, InstallProgress, VersionsError> {
+        instances_dir: PathBuf,
+    ) -> impl Straw<(PathBuf, Vec<GameMod>), InstallProgress, InstallError> {
         sipper(async move |mut progress| {
             let install_path = if let GameVersionSource::Local(local_game) = version.source {
                 local_game.path
@@ -876,8 +945,57 @@ impl Screen {
                 )
                 .await?
             };
+            let instance_dir = instances_dir.join(id.to_string());
+            let mod_folder = instance_dir.join("Mods");
+            let logo_folder = instance_dir.join("Logos");
+            let game_mods: Vec<GameMod> = stream::iter(mods)
+                .map(|(mod_detail, release): (Box<ModDetail>, Release)| {
+                    let modid = mod_detail.modid;
+                    let releaseid = release.releaseid;
+                    let mod_folder = mod_folder.clone();
+                    let logo_folder = logo_folder.clone();
+                    let progress = progress.clone();
+                    async move {
+                        let mod_path = sipper(async move |mut mod_progress| {
+                            download_mod(mod_folder, release, &mut mod_progress).await
+                        })
+                        .with(move |p| InstallProgress::DownloadingMods(modid, p))
+                        .run(&progress)
+                        .await?;
+                        let logo = if let Some(logo_file) = mod_detail.logofile {
+                            Some(
+                                save_image(logo_folder.join(format!("{}.png", modid)), logo_file)
+                                    .await?,
+                            )
+                        } else {
+                            None
+                        };
+                        Ok::<GameMod, InstallError>(GameMod::moddb(
+                            modid,
+                            releaseid,
+                            mod_path,
+                            logo,
+                            mod_detail.name,
+                            mod_detail.text,
+                        ))
+                    }
+                })
+                .buffer_unordered(3)
+                .try_collect()
+                .await?;
             progress.send(InstallProgress::Done).await;
-            Ok(install_path)
+            Ok((install_path, game_mods))
         })
     }
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum InstallError {
+    #[error("Error while installing the game version: {0}")]
+    VersionsError(#[from] VersionsError),
+    #[error("Error while installing the Mods: {0}")]
+    ModsError(#[from] ModsError),
+
+    #[error("Error while trying to handle images: {0}")]
+    ImagesError(#[from] ImagesError),
 }

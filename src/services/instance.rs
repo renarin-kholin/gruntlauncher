@@ -57,7 +57,7 @@ pub async fn add_instance(
 ) -> Result<GruntInstance> {
     tokio::fs::create_dir_all(&instances_path).await?;
     let instance_path = instances_path.join(instance.id.to_string());
-    tokio::fs::create_dir(&instance_path).await?;
+    tokio::fs::create_dir_all(&instance_path).await?;
     let mut instance_config =
         tokio::fs::File::create_new(instance_path.join("instance.toml")).await?;
     instance_config

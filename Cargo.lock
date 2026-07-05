@@ -1849,6 +1849,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "directories",
+ "futures",
  "iced",
  "iced_aw",
  "iced_blitzview",

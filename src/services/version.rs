@@ -11,7 +11,7 @@ use crate::{
     assets::VSAPI_VERSIONS,
     core::version::{GameVersion, GameVersionSource, merge_versions},
     paths::{self, ProjectDirError},
-    services::HTTP,
+    services::{HTTP, game_mod::ModDownloadProgress},
 };
 
 #[derive(Deserialize, Debug)]
@@ -193,6 +193,7 @@ pub enum InstallProgress {
     Downloading { downloaded: u64, total: u64 },
     Verifying,
     Installing,
+    DownloadingMods(i64, ModDownloadProgress),
     Done,
     Failed(VersionsError),
 }
@@ -200,14 +201,14 @@ pub async fn download_version(
     gameversion: GameVersion,
     progress: &mut sipper::Sender<InstallProgress>,
 ) -> Result<Option<PathBuf>, VersionsError> {
-    if let GameVersionSource::Remote(remote_mod) = &gameversion.source {
+    if let GameVersionSource::Remote(remote_game) = &gameversion.source {
         let cache_dir = paths::cache_dir()?;
         let temp_download_path = cache_dir.join(gameversion.version.to_string());
         tokio::fs::create_dir_all(&temp_download_path).await?;
 
-        let temp_file_path = temp_download_path.join(&remote_mod.filename);
+        let temp_file_path = temp_download_path.join(&remote_game.filename);
         let mut temp_file = tokio::fs::File::create(&temp_file_path).await?;
-        let response = HTTP.get(&remote_mod.url).send().await?;
+        let response = HTTP.get(&remote_game.url).send().await?;
         let total = response
             .content_length()
             .ok_or(VersionsError::NoContentLength)?;

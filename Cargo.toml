@@ -12,6 +12,7 @@ opt-level = 2
 [dependencies]
 bytes = "1.12.0"
 directories = "6.0.0"
+futures = "0.3.32"
 iced = { version = "0.14.0", features = ["image", "selector", "debug", "advanced", "lazy", "tokio", "wgpu", "sipper"] }
 iced_aw = { version = "0.14.0", features = ["full"] }
 # iced_webview_v2 = { git = "https://github.com/franzos/iced_webview_v2", default-features = false, features = ["blitz", "litehtml"] }  # or "cef"

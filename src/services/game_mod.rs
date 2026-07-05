@@ -1,6 +1,7 @@
-use std::{str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use sipper::StreamExt;
 use thiserror::Error;
 use tracing::debug;
 
@@ -159,6 +160,9 @@ pub enum ModsError {
 
     #[error("Failed fetching mods from the api")]
     ModAPIError,
+
+    #[error("received response had no content length specified")]
+    NoContentLength,
 }
 impl From<reqwest::Error> for ModsError {
     fn from(value: reqwest::Error) -> Self {
@@ -166,6 +170,11 @@ impl From<reqwest::Error> for ModsError {
     }
 }
 
+impl From<std::io::Error> for ModsError {
+    fn from(value: std::io::Error) -> Self {
+        ModsError::Io(Arc::new(value))
+    }
+}
 pub type Result<T> = std::result::Result<T, ModsError>;
 pub async fn search_mods(query: String) -> Result<Vec<ModListEntry>> {
     let url = reqwest::Url::from_str(VSMODDB)?.join("mods")?;
@@ -194,4 +203,55 @@ pub async fn get_mod_details(mod_id: String) -> Result<Box<ModDetail>> {
     let response = HTTP.get(url).send().await?;
     let parsed_response: ModDetailResponse = response.json().await?;
     Ok(Box::new(parsed_response.moddetails))
+}
+#[derive(Debug, Clone)]
+pub enum ModDownloadProgress {
+    Queued,
+    Downloading { total: u64, downloaded: u64 },
+    Downloaded,
+    Failed(ModsError),
+}
+pub async fn download_mod(
+    dest: PathBuf,
+    release: Release,
+    progress: &mut sipper::Sender<ModDownloadProgress>,
+) -> Result<PathBuf> {
+    let result: Result<PathBuf> = {
+        tokio::fs::create_dir_all(&dest).await?;
+        let temp_file_path = dest.join(release.filename);
+        let mut temp_file = tokio::fs::File::create(&temp_file_path).await?;
+        let response = HTTP.get(release.mainfile).send().await?;
+        let total = response
+            .content_length()
+            .ok_or(ModsError::NoContentLength)?;
+        progress
+            .send(ModDownloadProgress::Downloading {
+                total,
+                downloaded: 0,
+            })
+            .await;
+
+        let mut byte_stream = response.bytes_stream();
+        let mut downloaded = 0;
+        while let Some(next_bytes) = byte_stream.next().await {
+            let bytes = next_bytes?;
+            tokio::io::AsyncWriteExt::write_all(&mut temp_file, &bytes).await?;
+            downloaded += bytes.len();
+            progress
+                .send(ModDownloadProgress::Downloading {
+                    downloaded: downloaded as u64,
+                    total,
+                })
+                .await;
+        }
+        progress.send(ModDownloadProgress::Downloaded).await;
+        Ok(temp_file_path)
+    };
+    match &result {
+        Ok(_) => {}
+        Err(e) => {
+            progress.send(ModDownloadProgress::Failed(e.clone())).await;
+        }
+    }
+    result
 }

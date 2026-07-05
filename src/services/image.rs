@@ -1,7 +1,8 @@
+use bytes::Bytes;
 use image::ImageError;
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 use thiserror::Error;
-use tokio::task::JoinError;
+use tokio::{io, task::JoinError};
 
 use crate::services::HTTP;
 #[derive(Clone, Debug, Error)]
@@ -14,6 +15,9 @@ pub enum ImagesError {
 
     #[error("Tokio task join error: {0}")]
     JoinError(Arc<JoinError>),
+
+    #[error("IO Error")]
+    IOError(Arc<io::Error>),
 }
 
 impl From<reqwest::Error> for ImagesError {
@@ -24,6 +28,11 @@ impl From<reqwest::Error> for ImagesError {
 impl From<ImageError> for ImagesError {
     fn from(value: ImageError) -> Self {
         Self::ImageError(Arc::new(value))
+    }
+}
+impl From<io::Error> for ImagesError {
+    fn from(value: io::Error) -> Self {
+        Self::IOError(Arc::new(value))
     }
 }
 impl From<JoinError> for ImagesError {
@@ -48,8 +57,11 @@ impl Debug for DecodedImage {
             .finish()
     }
 }
+pub async fn get_image_bytes(url: String) -> Result<Bytes> {
+    Ok(HTTP.get(url).send().await?.bytes().await?)
+}
 pub async fn load_image(url: String) -> Result<DecodedImage> {
-    let bytes = HTTP.get(url).send().await?.bytes().await?;
+    let bytes = get_image_bytes(url).await?;
     let decoded_image = tokio::task::spawn_blocking(move || -> Result<DecodedImage> {
         let rgba = image::load_from_memory(&bytes)?
             .thumbnail(28, 28)
@@ -63,4 +75,13 @@ pub async fn load_image(url: String) -> Result<DecodedImage> {
     })
     .await??;
     Ok(decoded_image)
+}
+
+pub async fn save_image(path: PathBuf, url: String) -> Result<PathBuf> {
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    let bytes = get_image_bytes(url).await?;
+    tokio::fs::write(&path, &bytes).await?;
+    Ok(path)
 }
