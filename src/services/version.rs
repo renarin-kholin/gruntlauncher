@@ -1,4 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
+#[cfg(target_os = "windows")]
+use std::{ffi::OsString, path::Path};
 
 use iced::futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,9 @@ use crate::{
     paths::{self, ProjectDirError},
     services::{HTTP, game_mod::ModDownloadProgress},
 };
+
+#[cfg(target_os = "windows")]
+use crate::assets::VSWINREGKEY;
 
 #[derive(Deserialize, Debug)]
 struct VSAPIVersionURLsObject {
@@ -80,6 +85,9 @@ pub enum VersionsError {
 
     #[error("Failed downloading archive")]
     DownloadError,
+
+    #[error("Version installer failed: {0}")]
+    InstallerError(String),
 }
 impl From<std::io::Error> for VersionsError {
     fn from(value: std::io::Error) -> Self {
@@ -91,9 +99,8 @@ impl From<reqwest::Error> for VersionsError {
         VersionsError::Reqwest(Arc::new(value))
     }
 }
-pub async fn load_local_versions(
-    installations_path: PathBuf,
-) -> Result<Vec<GameVersion>, VersionsError> {
+pub type Result<T> = std::result::Result<T, VersionsError>;
+pub async fn load_local_versions(installations_path: PathBuf) -> Result<Vec<GameVersion>> {
     tokio::fs::create_dir_all(&installations_path).await?;
     let versions_dir = tokio::fs::read_dir(installations_path).await?;
     let mut versions_dir = ReadDirStream::new(versions_dir);
@@ -123,7 +130,7 @@ fn sort_newest_first(versions: &mut [GameVersion]) {
 async fn get_versions_from_api(
     versions_path: PathBuf,
     installations_path: PathBuf,
-) -> Result<Vec<GameVersion>, VersionsError> {
+) -> Result<Vec<GameVersion>> {
     let response = HTTP.get(VSAPI_VERSIONS).send().await?;
 
     let parsed_response = response.json::<HashMap<String, VSAPIVersion>>().await?;
@@ -159,16 +166,14 @@ async fn get_versions_from_api(
         .await?;
     Ok(gameversions)
 }
-pub async fn refresh_versions(
-    installations_path: PathBuf,
-) -> Result<Vec<GameVersion>, VersionsError> {
+pub async fn refresh_versions(installations_path: PathBuf) -> Result<Vec<GameVersion>> {
     let cache_dir = paths::cache_dir()?;
     tokio::fs::create_dir_all(&cache_dir).await?;
 
     get_versions_from_api(cache_dir.join("versions.toml"), installations_path).await
 }
 
-pub async fn load_versions(installations_path: PathBuf) -> Result<Vec<GameVersion>, VersionsError> {
+pub async fn load_versions(installations_path: PathBuf) -> Result<Vec<GameVersion>> {
     let cache_dir = paths::cache_dir()?;
     tokio::fs::create_dir_all(&cache_dir).await?;
 
@@ -188,7 +193,7 @@ pub async fn load_versions(installations_path: PathBuf) -> Result<Vec<GameVersio
 }
 
 #[derive(Debug, Clone)]
-pub enum InstallProgress {
+pub enum InstallStatus {
     NotStarted,
     Downloading { downloaded: u64, total: u64 },
     Verifying,
@@ -199,55 +204,84 @@ pub enum InstallProgress {
 }
 pub async fn download_version(
     gameversion: GameVersion,
-    progress: &mut sipper::Sender<InstallProgress>,
-) -> Result<Option<PathBuf>, VersionsError> {
+    progress: &mut sipper::Sender<InstallStatus>,
+) -> Result<Option<PathBuf>> {
     if let GameVersionSource::Remote(remote_game) = &gameversion.source {
         let cache_dir = paths::cache_dir()?;
         let temp_download_path = cache_dir.join(gameversion.version.to_string());
         tokio::fs::create_dir_all(&temp_download_path).await?;
 
         let temp_file_path = temp_download_path.join(&remote_game.filename);
-        let mut temp_file = tokio::fs::File::create(&temp_file_path).await?;
-        let response = HTTP.get(&remote_game.url).send().await?;
-        let total = response
-            .content_length()
-            .ok_or(VersionsError::NoContentLength)?;
-        let _ = progress
-            .send(InstallProgress::Downloading {
-                downloaded: 0,
-                total,
-            })
-            .await;
-        let mut byte_stream = response.bytes_stream();
-        let mut downloaded = 0;
-        while let Some(next_bytes) = byte_stream.next().await {
-            let bytes = next_bytes?;
-            tokio::io::AsyncWriteExt::write_all(&mut temp_file, &bytes).await?;
-            downloaded += bytes.len();
-            progress
-                .send(InstallProgress::Downloading {
-                    downloaded: downloaded as u64,
+        if let Ok(mut temp_file) = tokio::fs::File::create_new(&temp_file_path).await {
+            //The file already exsits otherwise
+            let response = HTTP.get(&remote_game.url).send().await?;
+            let total = response
+                .content_length()
+                .ok_or(VersionsError::NoContentLength)?;
+            let _ = progress
+                .send(InstallStatus::Downloading {
+                    downloaded: 0,
                     total,
                 })
                 .await;
+            let mut byte_stream = response.bytes_stream();
+            let mut downloaded = 0;
+            while let Some(next_bytes) = byte_stream.next().await {
+                let bytes = next_bytes?;
+                tokio::io::AsyncWriteExt::write_all(&mut temp_file, &bytes).await?;
+                downloaded += bytes.len();
+                progress
+                    .send(InstallStatus::Downloading {
+                        downloaded: downloaded as u64,
+                        total,
+                    })
+                    .await;
+            }
         }
         return Ok(Some(temp_file_path));
     }
     Ok(None)
 }
-pub async fn extract_archive(
+
+pub async fn install_game(
     gameversion: GameVersion,
     archive_path: PathBuf,
     versions_path: PathBuf,
-    progress: &mut sipper::Sender<InstallProgress>,
-) -> Result<PathBuf, VersionsError> {
+    progress: &mut sipper::Sender<InstallStatus>,
+) -> Result<PathBuf> {
     let install_path = versions_path.join(gameversion.version.to_string());
 
     tokio::fs::create_dir_all(&install_path).await?;
 
-    progress.send(InstallProgress::Installing).await;
+    progress.send(InstallStatus::Installing).await;
 
+    #[cfg(target_os = "windows")]
+    return windows_install(
+        gameversion,
+        archive_path,
+        versions_path,
+        install_path,
+        progress,
+    )
+    .await;
     #[cfg(not(target_os = "windows"))]
+    return extract_archive(
+        gameversion,
+        archive_path,
+        versions_path,
+        install_path,
+        progress,
+    )
+    .await;
+}
+#[cfg(not(target_os = "windows"))]
+pub async fn extract_archive(
+    _gameversion: GameVersion,
+    archive_path: PathBuf,
+    _versions_path: PathBuf,
+    install_path: PathBuf,
+    _progress: &mut sipper::Sender<InstallStatus>,
+) -> Result<PathBuf> {
     let extract_child = Command::new("tar")
         .arg("-xzf")
         .arg(archive_path.as_os_str())
@@ -255,14 +289,100 @@ pub async fn extract_archive(
         .arg(install_path.as_os_str())
         .arg("--strip-components=1")
         .status();
-    #[cfg(target_os = "windows")]
-    let extract_child = Command::new(archive_path.as_os_str())
-        .arg("/VERYSILENT")
-        .arg("/SUPRESSMSGBOXES")
-        .arg("/DIR=")
-        .arg(install_path.as_os_str())
-        .status();
     extract_child.await?;
 
     Ok(install_path)
+}
+#[cfg(target_os = "windows")]
+enum RegistryStatus {
+    Clean,
+    TaintedWithGruntLauncher,
+    Tainted,
+}
+#[cfg(target_os = "windows")]
+async fn is_registry_tainted(install_path: &PathBuf) -> Result<RegistryStatus> {
+    use RegistryStatus::*;
+    if let Ok(vs_reg_key) = winreg::HKCU.open_subkey(VSWINREGKEY) {
+        if let Ok(reg_install_location) = vs_reg_key.get_value::<String, &str>("InstallLocation") {
+            if Path::new(&reg_install_location).starts_with(install_path) {
+                return Ok(TaintedWithGruntLauncher);
+            } else {
+                return Ok(Tainted);
+            }
+        }
+    } else {
+        warn!("Could not read vintage story registry key");
+    }
+    Ok(Clean)
+}
+//Cleans registry subkeys created as a side effect of grunt launcher running the game installer
+#[cfg(target_os = "windows")]
+async fn clean_registry() {
+    if winreg::HKCU.delete_subkey_all(VSWINREGKEY).is_err() {
+        error!("Could not delete registry tainted subkeys.");
+    }
+}
+#[cfg(target_os = "windows")]
+async fn windows_install(
+    _gameversion: GameVersion,
+    archive_path: PathBuf,
+    _versions_path: PathBuf,
+    install_path: PathBuf,
+    progress: &mut sipper::Sender<InstallStatus>,
+) -> Result<PathBuf> {
+    //Check if the user already has a vintage story installation that might interfere with the
+    //launcher's installation
+    let mut saved_reg_key: Option<Vec<(String, String)>> = None;
+    match is_registry_tainted(&install_path).await? {
+        RegistryStatus::Clean => {
+            debug!("Registry is clean.")
+        }
+        RegistryStatus::Tainted => {
+            debug!("Original installation found that was not created by gruntlauncher.");
+            saved_reg_key = winreg::HKCU.open_subkey(VSWINREGKEY).ok().map(|key| {
+                key.enum_values()
+                    .filter_map(std::result::Result::ok)
+                    .map(|(name, value)| (name, value.to_string()))
+                    .collect()
+            });
+        }
+        RegistryStatus::TaintedWithGruntLauncher => {
+            debug!("Installation created by gruntlauncher found. Cleaning");
+        }
+    }
+    clean_registry().await;
+    let mut dir_path = OsString::from("/DIR=");
+    dir_path.push(&install_path);
+    let install_child_status = Command::new(archive_path.as_os_str())
+        .arg("/VERYSILENT")
+        .arg("/SUPPRESSMSGBOXES")
+        .arg(dir_path)
+        .arg("/NORESTART")
+        .arg("/CURRENTUSER")
+        .arg("/NOICONS")
+        .arg("/TASKS=\"\"")
+        .arg("/LOG")
+        .arg("/CLOSEAPPLICATIONS")
+        .status();
+    let install_child_status = install_child_status.await?;
+    debug!("Install Status: {:?}", install_child_status);
+    //Clean up newly created registry entry because we dont want it to interfere with future
+    //installations
+    clean_registry().await;
+    //Restore regkey if it existed before the installation by gruntlauncher
+    if let Some(saved_reg_key) = &saved_reg_key {
+        let (created_reg_key, _) = winreg::HKCU.create_subkey(VSWINREGKEY)?;
+        for (name, value) in saved_reg_key {
+            created_reg_key.set_value(name, value)?;
+        }
+    }
+    if install_child_status.success() {
+        Ok(install_path)
+    } else {
+        let install_error = VersionsError::InstallerError(format!("{:?}", install_child_status));
+        progress
+            .send(InstallStatus::Failed(install_error.clone()))
+            .await;
+        Err(install_error)
+    }
 }

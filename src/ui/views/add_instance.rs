@@ -37,7 +37,7 @@ use crate::{
         image::{ImagesError, save_image},
         instance::{self, InstancesError},
         version::{
-            InstallProgress, VersionsError, download_version, extract_archive, load_versions,
+            InstallStatus, VersionsError, download_version, install_game, load_versions,
             refresh_versions,
         },
     },
@@ -86,7 +86,7 @@ pub struct Screen {
     selected_mod: Option<i64>,
     selected_mod_release: Option<Release>,
     selected_mods: Vec<(Box<ModDetail>, Release)>,
-    install_progress: InstallProgress,
+    install_status: InstallStatus,
     mod_search_query: String,
     mod_search_results: ModSearchState,
     mod_detail: ModDetailState,
@@ -134,7 +134,7 @@ pub enum Message {
 
     //Service Result events
     VersionsLoaded(Result<Vec<GameVersion>, VersionsError>),
-    InstanceInstalling(InstallProgress),
+    InstanceInstalling(InstallStatus),
     InstanceInstalled(Result<(PathBuf, Vec<GameMod>), InstallError>),
     ModSearchFetched(Result<Vec<ModListEntry>, ModsError>),
     ModDetailsFetched(Result<Box<ModDetail>, ModsError>),
@@ -154,7 +154,7 @@ impl Screen {
             rows: vec![],
             step: Step::Basic,
             selected_mod: None,
-            install_progress: InstallProgress::NotStarted,
+            install_status: InstallStatus::NotStarted,
             selected_mod_release: None,
             selected_mods: vec![],
             mod_search_query: String::new(),
@@ -303,10 +303,10 @@ impl Screen {
         .into()
     }
     fn view_progress_overlay(&self) -> Element<'_, Message> {
-        use InstallProgress::*;
+        use InstallStatus::*;
 
         let main_container = column![].spacing(10.0).padding(10.0);
-        match &self.install_progress {
+        match &self.install_status {
             NotStarted => main_container.push(text!("Starting download please wait...")),
             Downloading { downloaded, total } => main_container
                 .push(text!("Downloading game file"))
@@ -406,7 +406,7 @@ impl Screen {
             .height(Length::Shrink)
         ]
         .spacing(10.0);
-        let child = if matches!(self.install_progress, InstallProgress::NotStarted) {
+        let child = if matches!(self.install_status, InstallStatus::NotStarted) {
             None
         } else {
             Some(self.view_progress_overlay())
@@ -858,13 +858,13 @@ impl Screen {
                 }
             },
             InstanceInstalling(progress) => {
-                if let InstallProgress::DownloadingMods(modid, ref modprogress) = progress {
+                if let InstallStatus::DownloadingMods(modid, ref modprogress) = progress {
                     self.mod_download_progress
                         .entry(modid)
                         .and_modify(|m| *m = modprogress.clone())
                         .or_insert(modprogress.clone());
                 }
-                self.install_progress = progress;
+                self.install_status = progress;
             }
             OpenInBrowser(url) => {
                 let _ = webbrowser::open(&url);
@@ -931,13 +931,13 @@ impl Screen {
         mods: Vec<(Box<ModDetail>, Release)>,
         install_dir: PathBuf,
         instances_dir: PathBuf,
-    ) -> impl Straw<(PathBuf, Vec<GameMod>), InstallProgress, InstallError> {
+    ) -> impl Straw<(PathBuf, Vec<GameMod>), InstallStatus, InstallError> {
         sipper(async move |mut progress| {
             let install_path = if let GameVersionSource::Local(local_game) = version.source {
                 local_game.path
             } else {
                 let archive_path = download_version(version.clone(), &mut progress).await?;
-                extract_archive(
+                install_game(
                     version,
                     archive_path.ok_or(VersionsError::DownloadError)?,
                     install_dir,
@@ -959,7 +959,7 @@ impl Screen {
                         let mod_path = sipper(async move |mut mod_progress| {
                             download_mod(mod_folder, release, &mut mod_progress).await
                         })
-                        .with(move |p| InstallProgress::DownloadingMods(modid, p))
+                        .with(move |p| InstallStatus::DownloadingMods(modid, p))
                         .run(&progress)
                         .await?;
                         let logo = if let Some(logo_file) = mod_detail.logofile {
@@ -983,7 +983,7 @@ impl Screen {
                 .buffer_unordered(3)
                 .try_collect()
                 .await?;
-            progress.send(InstallProgress::Done).await;
+            progress.send(InstallStatus::Done).await;
             Ok((install_path, game_mods))
         })
     }
