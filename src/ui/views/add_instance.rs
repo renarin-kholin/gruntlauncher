@@ -82,6 +82,7 @@ pub struct Screen {
     selected_version: Option<GameVersion>,
     columns: Vec<TableColumn>,
     rows: Vec<Vec<String>>,
+    icon_handle: image::Handle,
     step: Step,
     selected_mod: Option<i64>,
     selected_mod_release: Option<Release>,
@@ -145,6 +146,7 @@ impl Screen {
     pub fn new(state: &mut GruntState) -> (Self, Task<Message>) {
         let mut screen = Self {
             id: uuid::Uuid::new_v4(),
+            icon_handle: image::Handle::from_bytes(GRUNT_ICON),
             name: String::new(),
             selected_version: None,
             columns: vec![
@@ -230,7 +232,8 @@ impl Screen {
         column![
             //Instance details (name and icon)
             row![
-                button(image("assets/icons/logo.png").height(50.0).width(50.0)).style(button::text),
+                button(image(self.icon_handle.clone()).height(50.0).width(50.0))
+                    .style(button::text),
                 column![
                     text!("Instance Name "),
                     text_input("Default name", &self.name).on_input(NameChanged)
@@ -273,7 +276,7 @@ impl Screen {
         state: &GruntState,
     ) -> Element<'_, Message> {
         use Message::*;
-        let mut mod_logo = image::Handle::from_bytes(GRUNT_ICON);
+        let mut mod_logo = self.icon_handle.clone();
         if let Some(logo) = state.image_cache.peek(&mod_detail.modid) {
             mod_logo = logo.clone();
         }
@@ -359,7 +362,8 @@ impl Screen {
         let base = column![
             //Instance details (name and icon)
             row![
-                button(image("assets/icons/logo.png").height(50.0).width(50.0)).style(button::text),
+                button(image(self.icon_handle.clone()).height(50.0).width(50.0))
+                    .style(button::text),
                 column![
                     text!("Instance Name "),
                     text!("{}", &self.name),
