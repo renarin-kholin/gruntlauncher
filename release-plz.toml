@@ -1,0 +1,13 @@
+[workspace]
+changelog_update = true
+git_release_enable = true
+
+[[package]]
+name = "gruntlauncher"
+publish = false
+git_tag_enable = true
+git_release_enable = true
+
+[[package]]
+name = "iced_blitzview"
+release = false
