@@ -26,8 +26,7 @@ use crate::{
 pub struct Screen {
     selected_instance: Option<InstanceId>,
     icon_handles: Vec<Handle>,
-    accounts: Vec<Account>,
-    selected_account: Option<String>,
+    show_login: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -52,8 +51,7 @@ impl Screen {
         Self {
             selected_instance: None,
             icon_handles: vec![Handle::from_bytes(GRUNT_ICON)],
-            accounts: vec![],
-            selected_account: None,
+            show_login: false,
         }
     }
 
@@ -93,11 +91,11 @@ impl Screen {
     pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         let mut accounts = column![];
-        accounts = if self.accounts.is_empty() {
+        accounts = if state.accounts.is_empty() {
             accounts.push(button("Sign In").on_press(LoginRequested(LoginRequest::AddAccount)))
         } else {
             accounts.push(
-                account::AccountSwitcher::new(&self.accounts, self.selected_account.as_deref())
+                account::AccountSwitcher::new(&state.accounts, state.selected_account.as_deref())
                     .on_login(LoginRequested)
                     .on_select(AccountSelected)
                     .on_remove(AccountRemove),
@@ -151,8 +149,12 @@ impl Screen {
         ]
         .height(Length::Fill)
         .width(Length::Fill);
-        let panel_children = self.login_view(&state);
-        overlay_container(base.into(), Some(panel_children), Some("Login".to_string()))
+        let panel_children = if self.show_login {
+            Some(self.login_view(state))
+        } else {
+            None
+        };
+        overlay_container(base.into(), panel_children, Some("Login".to_string()))
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
@@ -184,12 +186,12 @@ impl Screen {
                 debug!("{result:?}");
             }
             AccountSelected(username) => {
-                self.selected_account = Some(username);
+                state.selected_account = Some(username);
             }
             AccountRemove(username) => {
-                self.accounts.retain(|a| a.username != username);
-                if self.selected_account.as_deref() == Some(username.as_str()) {
-                    self.selected_account = self.accounts.first().map(|a| a.username.clone());
+                state.accounts.retain(|a| a.username != username);
+                if state.selected_account.as_deref() == Some(username.as_str()) {
+                    state.selected_account = state.accounts.first().map(|a| a.username.clone());
                 }
             }
             LoginRequested(login_request) => {
