@@ -2,20 +2,32 @@ use iced::{
     Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
-    widget::{self, button, column, image::Handle, row, rule, scrollable, text},
+    widget::{self, button, column, image::Handle, right, row, rule, scrollable, space, text},
 };
 use tracing::debug;
 
 use crate::{
     assets::GRUNT_ICON,
-    core::instance::{GruntInstance, InstanceId},
+    core::{
+        account::Account,
+        instance::{GruntInstance, InstanceId},
+    },
     services::instance::{self, InstancesError},
-    ui::{GruntAction, GruntState, views::ScreenOutput},
+    ui::{
+        GruntAction, GruntState,
+        views::ScreenOutput,
+        widget::{
+            account::{self, LoginRequest},
+            overlay::overlay_container,
+        },
+    },
 };
 
 pub struct Screen {
     selected_instance: Option<InstanceId>,
     icon_handles: Vec<Handle>,
+    accounts: Vec<Account>,
+    selected_account: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +36,9 @@ pub enum Message {
     LaunchInstance,
     InstanceLaunched(Result<(), InstancesError>),
     AddInstance,
+    AccountSelected(String),
+    AccountRemove(String),
+    LoginRequested(LoginRequest),
 }
 
 impl Default for Screen {
@@ -37,6 +52,8 @@ impl Screen {
         Self {
             selected_instance: None,
             icon_handles: vec![Handle::from_bytes(GRUNT_ICON)],
+            accounts: vec![],
+            selected_account: None,
         }
     }
 
@@ -69,13 +86,30 @@ impl Screen {
         })
         .into()
     }
+    pub fn login_view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
+        use Message::*;
+        space().into()
+    }
     pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
-        column![
+        use Message::*;
+        let mut accounts = column![];
+        accounts = if self.accounts.is_empty() {
+            accounts.push(button("Sign In").on_press(LoginRequested(LoginRequest::AddAccount)))
+        } else {
+            accounts.push(
+                account::AccountSwitcher::new(&self.accounts, self.selected_account.as_deref())
+                    .on_login(LoginRequested)
+                    .on_select(AccountSelected)
+                    .on_remove(AccountRemove),
+            )
+        };
+        let base = column![
             //Topbar
             row![
                 button("Add Instance").on_press(Message::AddInstance),
                 rule::vertical(2),
-                button("Settings")
+                button("Settings"),
+                right(accounts)
             ]
             .padding(padding::all(10.0))
             .spacing(10.0)
@@ -116,8 +150,9 @@ impl Screen {
             ]
         ]
         .height(Length::Fill)
-        .width(Length::Fill)
-        .into()
+        .width(Length::Fill);
+        let panel_children = self.login_view(&state);
+        overlay_container(base.into(), Some(panel_children), Some("Login".to_string()))
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
@@ -147,6 +182,18 @@ impl Screen {
             }
             InstanceLaunched(result) => {
                 debug!("{result:?}");
+            }
+            AccountSelected(username) => {
+                self.selected_account = Some(username);
+            }
+            AccountRemove(username) => {
+                self.accounts.retain(|a| a.username != username);
+                if self.selected_account.as_deref() == Some(username.as_str()) {
+                    self.selected_account = self.accounts.first().map(|a| a.username.clone());
+                }
+            }
+            LoginRequested(login_request) => {
+                debug!("{:?}", login_request);
             }
         }
         ScreenOutput::none()
