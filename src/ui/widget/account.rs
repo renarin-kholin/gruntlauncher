@@ -11,10 +11,11 @@ use super::util::{estimate_width, fill_label};
 use crate::core::account::{Account, AccountStatus};
 use crate::ui::theme::grunt_theme;
 
+pub type Email = String;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoginRequest {
     AddAccount,
-    Relogin(String),
+    Relogin(Email),
 }
 
 const CHIP_H: f32 = 30.0;

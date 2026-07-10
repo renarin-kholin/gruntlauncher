@@ -2,7 +2,10 @@ use iced::{
     Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
-    widget::{self, button, column, image::Handle, right, row, rule, scrollable, space, text},
+    widget::{
+        self, button, center, center_x, column, image::Handle, right, row, rule, scrollable, space,
+        text, text_input,
+    },
 };
 use tracing::debug;
 
@@ -22,11 +25,26 @@ use crate::{
         },
     },
 };
+#[derive(Default, Debug)]
+struct LoginDetail {
+    email: String,
+    password: String,
+    totp: String,
+    error: Option<String>,
+}
 
+impl LoginDetail {
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
 pub struct Screen {
     selected_instance: Option<InstanceId>,
     icon_handles: Vec<Handle>,
+
+    //Login form state
     show_login: bool,
+    login_details: LoginDetail,
 }
 
 #[derive(Debug, Clone)]
@@ -35,9 +53,16 @@ pub enum Message {
     LaunchInstance,
     InstanceLaunched(Result<(), InstancesError>),
     AddInstance,
+
+    //Login Related
     AccountSelected(String),
     AccountRemove(String),
     LoginRequested(LoginRequest),
+    EmailChange(String),
+    PasswordChange(String),
+    TOTPChange(String),
+    Login,
+    CancelLogin,
 }
 
 impl Default for Screen {
@@ -51,7 +76,10 @@ impl Screen {
         Self {
             selected_instance: None,
             icon_handles: vec![Handle::from_bytes(GRUNT_ICON)],
+
+            //Login Fields
             show_login: false,
+            login_details: LoginDetail::default(),
         }
     }
 
@@ -84,9 +112,33 @@ impl Screen {
         })
         .into()
     }
-    pub fn login_view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
+    pub fn view_login<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
-        space().into()
+        center(row![
+            space().width(Length::FillPortion(1)),
+            column![
+                text!("Email"),
+                text_input("example@email.com", &self.login_details.email).on_input(EmailChange),
+                space().height(10.0),
+                text!("Password"),
+                text_input("********", &self.login_details.password)
+                    .secure(true)
+                    .on_input(PasswordChange),
+                space().height(20.0),
+                button(center_x("Login"))
+                    .width(Length::Fill)
+                    .style(button::success)
+                    .on_press(Login),
+                button(center_x("Cancel"))
+                    .width(Length::Fill)
+                    .style(button::subtle)
+                    .on_press(CancelLogin)
+            ]
+            .spacing(5.0)
+            .width(Length::FillPortion(2)),
+            space().width(Length::FillPortion(1))
+        ])
+        .into()
     }
     pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
@@ -150,7 +202,7 @@ impl Screen {
         .height(Length::Fill)
         .width(Length::Fill);
         let panel_children = if self.show_login {
-            Some(self.login_view(state))
+            Some(self.view_login(state))
         } else {
             None
         };
@@ -195,7 +247,31 @@ impl Screen {
                 }
             }
             LoginRequested(login_request) => {
+                use LoginRequest::*;
                 debug!("{:?}", login_request);
+                match login_request {
+                    AddAccount => {
+                        self.show_login = true;
+                        self.login_details.clear();
+                    }
+                    Relogin(email) => {}
+                }
+            }
+            EmailChange(email) => {
+                self.login_details.email = email;
+            }
+            PasswordChange(password) => {
+                self.login_details.password = password;
+            }
+            TOTPChange(totp) => {
+                self.login_details.totp = totp;
+            }
+            Login => {
+                //Validate email, totp and then
+            }
+            CancelLogin => {
+                self.login_details.clear();
+                self.show_login = false;
             }
         }
         ScreenOutput::none()
