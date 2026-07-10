@@ -2,13 +2,10 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{self};
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Account {
-    email: String,
-    //TODO: Find what to store for account
-}
+use crate::{
+    core::account::Account,
+    paths::{self},
+};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Config {

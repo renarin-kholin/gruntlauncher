@@ -1,0 +1,108 @@
+use std::{collections::HashMap, sync::Arc};
+
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    assets::VSAUTH,
+    core::account::{Account, AccountStatus},
+    services::HTTP,
+};
+use thiserror::Error;
+use tracing::{debug, error};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SessionResponse {
+    pub sessionkey: Option<String>,
+    pub sessionsignature: Option<String>,
+    pub mptoken: Option<serde_json::Value>,
+    pub uid: Option<String>,
+    pub entitlements: Option<serde_json::Value>,
+    pub playername: Option<String>,
+    pub hasgameserver: Option<bool>,
+    pub valid: i64,
+    pub prelogintoken: Option<String>,
+    pub reason: Option<String>,
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum AccountsError {
+    #[error("request to the server failed: {0}")]
+    Reqwest(Arc<reqwest::Error>),
+    #[error("Failed when trying to get session details from login response.")]
+    ParseError,
+}
+impl From<reqwest::Error> for AccountsError {
+    fn from(value: reqwest::Error) -> Self {
+        AccountsError::Reqwest(Arc::new(value))
+    }
+}
+pub type Result<T> = std::result::Result<T, AccountsError>;
+
+type PreLoginToken = String;
+type LoginResponseMessage = String;
+#[derive(Clone, Debug)]
+pub enum LoginStatus {
+    Success(Account),
+    NeedTOTP(PreLoginToken),
+    WrongDetails,
+    IPChanged,
+    TemporarilyBlocked,
+    Failed,
+}
+
+pub async fn send_login(
+    email: String,
+    password: String,
+    totp: Option<String>,
+    prelogintoken: Option<String>,
+) -> Result<LoginStatus> {
+    let mut params = HashMap::new();
+    params.insert("email", email.clone());
+    params.insert("password", password);
+    if let (Some(totp), Some(prelogintoken)) = (totp, prelogintoken) {
+        params.insert("totpcode", totp);
+        params.insert("prelogintoken", prelogintoken);
+    }
+    debug!("{:?}", params);
+    let response = HTTP.post(VSAUTH).form(&params).send().await?;
+    let parsed_response: SessionResponse = response.json().await?;
+    debug!("{:?}", parsed_response);
+    match parsed_response.valid {
+        1 => {
+            let account = Account::new(
+                &parsed_response
+                    .playername
+                    .ok_or(AccountsError::ParseError)?,
+                &email,
+                AccountStatus::Ok,
+                parsed_response
+                    .sessionkey
+                    .ok_or(AccountsError::ParseError)?,
+                parsed_response
+                    .sessionsignature
+                    .ok_or(AccountsError::ParseError)?,
+                parsed_response.uid.ok_or(AccountsError::ParseError)?,
+            );
+            Ok(LoginStatus::Success(account))
+        }
+        _ => {
+            if let Some(ref reason) = parsed_response.reason {
+                match (reason.as_str(), parsed_response.prelogintoken.clone()) {
+                    ("requiretotpcode", Some(prelogintoken)) => {
+                        Ok(LoginStatus::NeedTOTP(prelogintoken))
+                    }
+                    ("invalidemailorpassword", None) => Ok(LoginStatus::WrongDetails),
+                    ("ipchanged", None) => Ok(LoginStatus::IPChanged),
+                    ("temporarilyblocked", None) => Ok(LoginStatus::TemporarilyBlocked),
+                    (_, _) => {
+                        debug!("{:?}", parsed_response);
+                        Ok(LoginStatus::Failed)
+                    }
+                }
+            } else {
+                error!("{:?}", parsed_response);
+                Ok(LoginStatus::Failed)
+            }
+        }
+    }
+}

@@ -1,7 +1,9 @@
+use email_address::EmailAddress;
 use iced::{
     Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
+    theme::palette::Success,
     widget::{
         self, button, center, center_x, column, image::Handle, right, row, rule, scrollable, space,
         text, text_input,
@@ -15,7 +17,10 @@ use crate::{
         account::Account,
         instance::{GruntInstance, InstanceId},
     },
-    services::instance::{self, InstancesError},
+    services::{
+        account::{AccountsError, LoginStatus, send_login},
+        instance::{self, InstancesError},
+    },
     ui::{
         GruntAction, GruntState,
         views::ScreenOutput,
@@ -30,6 +35,7 @@ struct LoginDetail {
     email: String,
     password: String,
     totp: String,
+    prelogintoken: Option<String>,
     error: Option<String>,
 }
 
@@ -61,8 +67,10 @@ pub enum Message {
     EmailChange(String),
     PasswordChange(String),
     TOTPChange(String),
-    Login,
+    DoLogin,
     CancelLogin,
+
+    LoginResult(Result<LoginStatus, AccountsError>),
 }
 
 impl Default for Screen {
@@ -114,28 +122,41 @@ impl Screen {
     }
     pub fn view_login<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
-        center(row![
-            space().width(Length::FillPortion(1)),
-            column![
-                text!("Email"),
-                text_input("example@email.com", &self.login_details.email).on_input(EmailChange),
-                space().height(10.0),
-                text!("Password"),
-                text_input("********", &self.login_details.password)
-                    .secure(true)
-                    .on_input(PasswordChange),
-                space().height(20.0),
+        let mut form = column![
+            text!("Email"),
+            text_input("example@email.com", &self.login_details.email).on_input(EmailChange),
+            space().height(10.0),
+            text!("Password"),
+            text_input("**********", &self.login_details.password)
+                .secure(true)
+                .on_input(PasswordChange),
+        ];
+        if let Some(error) = &self.login_details.error {
+            form = form.push(text!("{}", error));
+        }
+        if self.login_details.prelogintoken.is_some() {
+            form = form
+                .push(text!("Two factor code"))
+                .push(text_input("123456", &self.login_details.totp).on_input(TOTPChange));
+        }
+
+        form = form
+            .push(space().height(20.0))
+            .push(
                 button(center_x("Login"))
                     .width(Length::Fill)
                     .style(button::success)
-                    .on_press(Login),
+                    .on_press(DoLogin),
+            )
+            .push(
                 button(center_x("Cancel"))
                     .width(Length::Fill)
                     .style(button::subtle)
-                    .on_press(CancelLogin)
-            ]
-            .spacing(5.0)
-            .width(Length::FillPortion(2)),
+                    .on_press(CancelLogin),
+            );
+        center(row![
+            space().width(Length::FillPortion(1)),
+            form.spacing(5.0).width(Length::FillPortion(2)),
             space().width(Length::FillPortion(1))
         ])
         .into()
@@ -266,12 +287,61 @@ impl Screen {
             TOTPChange(totp) => {
                 self.login_details.totp = totp;
             }
-            Login => {
+            DoLogin => {
+                self.login_details.error = None;
+                debug!("Login");
                 //Validate email, totp and then
+                if !EmailAddress::is_valid(&self.login_details.email) {
+                    self.login_details.error = Some("Invalid email. Please try again.".to_string());
+                    return ScreenOutput::none();
+                }
+                let (totp) = if self.login_details.prelogintoken.is_some() {
+                    Some(self.login_details.totp.clone())
+                } else {
+                    None
+                };
+                return ScreenOutput::task(Task::perform(
+                    send_login(
+                        self.login_details.email.clone(),
+                        self.login_details.password.clone(),
+                        totp,
+                        self.login_details.prelogintoken.clone(),
+                    ),
+                    LoginResult,
+                ));
             }
             CancelLogin => {
                 self.login_details.clear();
                 self.show_login = false;
+            }
+            LoginResult(result) => {
+                match result {
+                    Ok(login_status) => {
+                        use LoginStatus::*;
+                        match login_status {
+                            Success(account) => {
+                                //Add session details to the state,
+                                state.accounts.push(account);
+                                self.login_details.clear();
+                                self.show_login = false;
+                            }
+                            NeedTOTP(prelogintoken) => {
+                                self.login_details.prelogintoken = Some(prelogintoken);
+                                self.login_details.error = Some(
+                                    "Please enter your two factor code to continue.".to_string(),
+                                );
+                            }
+                            WrongDetails => {}
+                            IPChanged => {}
+                            TemporarilyBlocked => {}
+                            Failed => {
+                                self.login_details.error =
+                                    Some("Login failed for unknown reason.".to_string());
+                            }
+                        }
+                    }
+                    Err(e) => self.login_details.error = Some(e.to_string()),
+                }
             }
         }
         ScreenOutput::none()
