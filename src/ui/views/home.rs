@@ -3,7 +3,6 @@ use iced::{
     Element, Length, Task,
     alignment::{Horizontal, Vertical},
     padding,
-    theme::palette::Success,
     widget::{
         self, button, center, center_x, column, image::Handle, right, row, rule, scrollable, space,
         text, text_input,
@@ -14,11 +13,11 @@ use tracing::{debug, error, info};
 use crate::{
     assets::GRUNT_ICON,
     core::{
-        account::Account,
+        account::AccountStatus,
         instance::{GruntInstance, InstanceId},
     },
     services::{
-        account::{AccountsError, LoginStatus, save_session, send_login},
+        account::{AccountsError, LoginStatus, save_session, send_login, validate_session},
         instance::{self, InstancesError},
     },
     ui::{
@@ -70,6 +69,7 @@ pub enum Message {
     DoLogin,
     CancelLogin,
     SessionSaved(Result<(), AccountsError>),
+    SessionValidated(Result<bool, AccountsError>),
 
     LoginResult(Result<LoginStatus, AccountsError>),
 }
@@ -121,7 +121,7 @@ impl Screen {
         })
         .into()
     }
-    pub fn view_login<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
+    pub fn view_login<'a>(&'a self, _state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         let mut form = column![
             text!("Email"),
@@ -266,10 +266,10 @@ impl Screen {
             AccountSelected(username) => {
                 state.selected_account = Some(username.clone());
                 if let Some(account) = state.accounts.iter().find(|a| a.username == username) {
-                    return ScreenOutput::task(Task::perform(
-                        save_session(account.clone()),
-                        SessionSaved,
-                    ));
+                    return ScreenOutput::task(Task::batch([
+                        Task::perform(save_session(account.clone()), SessionSaved),
+                        Task::perform(validate_session(account.clone()), SessionValidated),
+                    ]));
                 }
             }
             AccountRemove(username) => {
@@ -285,7 +285,7 @@ impl Screen {
                         self.show_login = true;
                         self.login_details.clear();
                     }
-                    Relogin(email) => {}
+                    Relogin(_email) => {}
                 }
             }
             EmailChange(email) => {
@@ -331,7 +331,15 @@ impl Screen {
                         match login_status {
                             Success(account) => {
                                 //Add session details to the state,
-                                state.accounts.push(account);
+                                if let Some(existing) = state
+                                    .accounts
+                                    .iter_mut()
+                                    .find(|a| a.username == account.username)
+                                {
+                                    *existing = account;
+                                } else {
+                                    state.accounts.push(account);
+                                }
                                 self.login_details.clear();
                                 self.show_login = false;
                             }
@@ -341,9 +349,16 @@ impl Screen {
                                     "Please enter your two factor code to continue.".to_string(),
                                 );
                             }
-                            WrongDetails => {}
-                            IPChanged => {}
-                            TemporarilyBlocked => {}
+                            WrongDetails => {
+                                self.login_details.error =
+                                    Some("Invalid email or password".to_string());
+                            }
+                            IPChanged => {
+                                self.login_details.error = Some("IP change was detected and relogin is required. Please try again.".to_string());
+                            }
+                            TemporarilyBlocked => {
+                                self.login_details.error = Some("You are temporarily blocked on the auth server for repeated logins. Try again later.".to_string());
+                            }
                             Failed => {
                                 self.login_details.error =
                                     Some("Login failed for unknown reason.".to_string());
@@ -355,6 +370,27 @@ impl Screen {
             }
             SessionSaved(result) => match result {
                 Ok(()) => info!("Updated session"),
+                Err(e) => error!("{e}"),
+            },
+            SessionValidated(result) => match result {
+                Ok(true) => info!("Session is valid."),
+                Ok(false) => {
+                    if let Some(username) = &state.selected_account
+                        && let Some(account) =
+                            state.accounts.iter_mut().find(|a| a.username == *username)
+                    {
+                        account.status = AccountStatus::Expired;
+                        self.login_details.clear();
+                        self.show_login = true;
+                        self.login_details.error =
+                            Some("Your login session has expired, login again.".into());
+                        self.login_details.email = account.email.clone();
+                        return ScreenOutput::task(Task::perform(
+                            save_session(account.clone()),
+                            SessionSaved,
+                        ));
+                    }
+                }
                 Err(e) => error!("{e}"),
             },
         }

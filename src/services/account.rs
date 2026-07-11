@@ -1,9 +1,12 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use url::form_urlencoded::parse;
 
 use crate::{
-    assets::VSAUTH,
+    assets::{VSAUTH, VSAUTHVALIDATE},
     core::account::{Account, AccountStatus, AccountStore},
     paths::{self, ProjectDirError},
     services::HTTP,
@@ -44,6 +47,9 @@ pub enum AccountsError {
 
     #[error("error when trying to serialize config file: {0}")]
     SerializeError(#[from] toml::ser::Error),
+
+    #[error(transparent)]
+    SerdeJson(Arc<serde_json::Error>),
 }
 impl From<reqwest::Error> for AccountsError {
     fn from(value: reqwest::Error) -> Self {
@@ -53,6 +59,11 @@ impl From<reqwest::Error> for AccountsError {
 impl From<std::io::Error> for AccountsError {
     fn from(value: std::io::Error) -> Self {
         AccountsError::Io(Arc::new(value))
+    }
+}
+impl From<serde_json::Error> for AccountsError {
+    fn from(value: serde_json::Error) -> Self {
+        AccountsError::SerdeJson(Arc::new(value))
     }
 }
 pub type Result<T> = std::result::Result<T, AccountsError>;
@@ -148,4 +159,22 @@ pub async fn send_login(
             }
         }
     }
+}
+#[derive(Deserialize, Serialize, Debug)]
+struct ClientValidateResponse {
+    valid: i32,
+}
+pub async fn validate_session(account: Account) -> Result<bool> {
+    let mut params = HashMap::new();
+    params.insert("uid", account.uid);
+    params.insert("sessionkey", account.sessionkey);
+
+    debug!("{:?}", params);
+    let response = HTTP.get(VSAUTHVALIDATE).form(&params).send().await?;
+    debug!("{:?}", response);
+    let response_text = response.text().await?;
+    debug!("{:?}", response_text);
+    let parsed_response: ClientValidateResponse = serde_json::from_str(&response_text)?;
+    debug!("{:?}", parsed_response);
+    Ok(parsed_response.valid == 1)
 }

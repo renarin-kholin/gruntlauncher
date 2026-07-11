@@ -1,28 +1,28 @@
 use iced::{
+    Element, Size, Task,
     widget::image::Handle,
     window::{icon, settings::PlatformSpecific},
-    Element, Size, Task,
 };
 use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
     core::{
-        account::{self, AccountStore},
+        account::AccountStore,
         config::Config,
         instance::GruntInstance,
     },
     services::{
-        account::{load_session, AccountsError},
+        account::{AccountsError, load_session},
         config::LoadConfigError,
-        image::{load_image, DecodedImage, ImagesError},
+        image::{DecodedImage, ImagesError, load_image},
         instance::InstancesError,
     },
     ui::{
-        theme::grunt_theme,
-        views::{add_instance, home, Screen},
-        widget::overlay::overlay_container,
         GruntState,
+        theme::grunt_theme,
+        views::{Screen, add_instance, home},
+        widget::overlay::overlay_container,
     },
 };
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";

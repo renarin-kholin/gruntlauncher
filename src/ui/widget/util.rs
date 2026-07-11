@@ -1,5 +1,5 @@
 use iced::advanced::text::{self, Text};
-use iced::{alignment, Color, Pixels, Point, Rectangle, Size};
+use iced::{Color, Pixels, Point, Rectangle, Size, alignment};
 
 pub(crate) fn fill_label<Renderer: text::Renderer>(
     renderer: &mut Renderer,

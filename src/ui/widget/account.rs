@@ -1,10 +1,10 @@
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::renderer::{self, Quad};
 use iced::advanced::text;
-use iced::advanced::widget::{tree, Tree, Widget};
-use iced::advanced::{overlay, Clipboard, Shell};
+use iced::advanced::widget::{Tree, Widget, tree};
+use iced::advanced::{Clipboard, Shell, overlay};
 use iced::{
-    keyboard, mouse, Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector,
+    Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, keyboard, mouse,
 };
 
 use super::util::{estimate_width, fill_label};
@@ -141,8 +141,8 @@ where
     ) {
         let state = tree.state.downcast_mut::<SwitcherState>();
 
-        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event {
-            if cursor.is_over(layout.bounds()) {
+        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event
+            && cursor.is_over(layout.bounds()) {
                 if self.accounts.is_empty() {
                     if let Some(on_login) = &self.on_login {
                         shell.publish(on_login(LoginRequest::AddAccount));
@@ -154,7 +154,6 @@ where
                 shell.capture_event();
                 shell.request_redraw();
             }
-        }
     }
 
     fn mouse_interaction(

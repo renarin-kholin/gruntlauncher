@@ -2,10 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    core::account::Account,
-    paths::{self},
-};
+use crate::paths::{self};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Config {
