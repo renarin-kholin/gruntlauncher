@@ -24,7 +24,7 @@ GruntLauncher manages multiple Vintage Story game versions and instances side by
 - [x] **Mod browsing**: search and browse mods from [ModDB](https://mods.vintagestory.at), with releases flagged for compatibility against the instance's selected game version.
 - [x] **One-step install**: selected mods are downloaded and installed alongside the game version when an instance is created.
 - [x] **Launch from the launcher**: start an instance directly, with its own data and mods directory.
-- [ ] **Accounts**: Login using your vintage story game account and use it with any instance without having to login every time.
+- [x] **Accounts**: Login using your vintage story game account and use it with any instance without having to login every time.
 - [ ] **Manage Instances and Settings**: Edit the details of your instances and edit global settings.
 
 

@@ -1,4 +1,3 @@
-use std::fs::{self};
 use std::sync::Arc;
 
 use tracing::info;
@@ -26,18 +25,18 @@ impl From<std::io::Error> for LoadConfigError {
     }
 }
 
-pub fn load_config() -> Result<Config, LoadConfigError> {
+pub async fn load_config() -> Result<Config, LoadConfigError> {
     info!("Loading config");
 
     let config_dir = paths::config_dir()?;
-    fs::create_dir_all(&config_dir)?;
+    tokio::fs::create_dir_all(&config_dir).await?;
     let config_path = config_dir.join("config.toml");
 
-    match fs::read_to_string(&config_path) {
+    match tokio::fs::read_to_string(&config_path).await {
         Ok(text) => Ok(toml::from_str(&text)?),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             let config = Config::default();
-            fs::write(&config_path, toml::to_string_pretty(&config)?)?;
+            tokio::fs::write(&config_path, toml::to_string_pretty(&config)?).await?;
             Ok(config)
         }
         Err(e) => Err(e.into()),
