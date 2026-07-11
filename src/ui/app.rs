@@ -7,8 +7,9 @@ use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
-    core::{config::Config, instance::GruntInstance},
+    core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
+        account::{AccountsError, load_session},
         config::LoadConfigError,
         image::{DecodedImage, ImagesError, load_image},
         instance::InstancesError,
@@ -29,6 +30,7 @@ pub enum GruntMessage {
     InstancesLoaded(Result<Vec<GruntInstance>, InstancesError>),
     ConfigLoaded(Result<Config, LoadConfigError>),
     ImageLoaded(Result<DecodedImage, ImagesError>, i64),
+    SessionLoaded(Result<AccountStore, AccountsError>),
 }
 
 pub enum GruntAction {
@@ -53,10 +55,13 @@ impl GruntLauncher {
                 home: home::Screen::new(),
                 state: GruntState::default(),
             },
-            Task::perform(
-                async move { crate::services::config::load_config() },
-                GruntMessage::ConfigLoaded,
-            ),
+            Task::batch([
+                Task::perform(
+                    async move { crate::services::config::load_config() },
+                    GruntMessage::ConfigLoaded,
+                ),
+                Task::perform(load_session(), GruntMessage::SessionLoaded),
+            ]),
         )
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
@@ -103,6 +108,19 @@ impl GruntLauncher {
                     }
                     Err(e) => {
                         error!("Error while loading image: {:?}", e);
+                    }
+                }
+                Task::none()
+            }
+            SessionLoaded(load_result) => {
+                info!("Session info loaded.");
+                match load_result {
+                    Ok(account_store) => {
+                        self.state.selected_account = account_store.selected_account;
+                        self.state.accounts = account_store.accounts;
+                    }
+                    Err(e) => {
+                        error!("Error while loading accounts store: {}", e);
                     }
                 }
                 Task::none()

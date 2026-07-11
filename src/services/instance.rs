@@ -1,21 +1,33 @@
 use std::{path::PathBuf, sync::Arc};
 
+use serde_json::{Value, json};
 use sipper::StreamExt;
 use thiserror::Error;
 use tokio::{io::AsyncWriteExt, process::Command};
 use tokio_stream::wrappers::ReadDirStream;
 use tracing::{debug, error, info};
 
-use crate::core::{instance::GruntInstance, version::GameVersionSource};
+use crate::{
+    core::{account::Account, instance::GruntInstance, version::GameVersionSource},
+    services::instance::InstancesError::ClientSettingsError,
+};
 
 #[derive(Error, Debug, Clone)]
 pub enum InstancesError {
     #[error("io error: {0}")]
     Io(Arc<std::io::Error>),
+
     #[error("error during serializing instance: {0}")]
     TomlSerError(#[from] toml::ser::Error),
+
     #[error("error during deserializing instance: {0}")]
     TomlDeError(#[from] toml::de::Error),
+
+    #[error("Error during patching clientsettings: {0}")]
+    ClientSettingsError(String),
+
+    #[error(transparent)]
+    SerdeJson(Arc<serde_json::Error>),
 }
 
 pub type Result<T> = std::result::Result<T, InstancesError>;
@@ -23,6 +35,11 @@ pub type Result<T> = std::result::Result<T, InstancesError>;
 impl From<std::io::Error> for InstancesError {
     fn from(value: std::io::Error) -> Self {
         InstancesError::Io(Arc::new(value))
+    }
+}
+impl From<serde_json::Error> for InstancesError {
+    fn from(value: serde_json::Error) -> Self {
+        InstancesError::SerdeJson(Arc::new(value))
     }
 }
 pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance>> {
@@ -67,7 +84,36 @@ pub async fn add_instance(
     Ok(instance)
 }
 
-pub async fn launch_instance(instance: GruntInstance, instances_path: PathBuf) -> Result<()> {
+pub async fn patch_client_settings(instance_path: PathBuf, account: Account) -> Result<()> {
+    let clientsettings_file = instance_path.join("clientsettings.json");
+    let root_text = match tokio::fs::read_to_string(&clientsettings_file).await {
+        Ok(text) => text,
+        Err(e) if e.kind() == tokio::io::ErrorKind::NotFound => "{}".to_string(),
+        Err(e) => return Err(e.into()),
+    };
+    let mut root: Value = serde_json::from_str(&root_text)?;
+    let ss = root
+        .as_object_mut()
+        .ok_or_else(|| ClientSettingsError("clientsettings.json root is not an object".into()))?
+        .entry("stringsettings")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or_else(|| ClientSettingsError("stringsettings exists but is not an object".into()))?;
+    ss.insert("sessionkey".to_string(), json!(account.sessionkey));
+    ss.insert(
+        "sessionsignature".to_string(),
+        json!(account.sessionsignature),
+    );
+    ss.insert("playeruid".to_string(), json!(account.uid));
+    ss.insert("playername".to_string(), json!(account.username));
+    tokio::fs::write(&clientsettings_file, serde_json::to_string_pretty(&root)?).await?;
+    Ok(())
+}
+pub async fn launch_instance(
+    instance: GruntInstance,
+    instances_path: PathBuf,
+    account: Option<Account>,
+) -> Result<()> {
     if let GameVersionSource::Local(game) = instance.version.source {
         let data_path = instances_path.join(instance.id.to_string());
         let mods_path = data_path.join("Mods");
@@ -80,6 +126,16 @@ pub async fn launch_instance(instance: GruntInstance, instances_path: PathBuf) -
         debug!("{:?}", mods_path);
         debug!(".{}", run_path.display());
         tokio::fs::create_dir_all(mods_path.clone()).await?;
+        if let Some(account) = account {
+            match patch_client_settings(data_path.clone(), account).await {
+                Ok(()) => {
+                    info!("Successfully patched clientsettings.json")
+                }
+                Err(e) => {
+                    error!("{e}");
+                }
+            }
+        }
         Command::new(run_path)
             .arg("--dataPath")
             .arg(data_path)
