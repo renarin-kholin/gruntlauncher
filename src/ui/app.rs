@@ -7,11 +7,7 @@ use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
-    core::{
-        account::AccountStore,
-        config::Config,
-        instance::GruntInstance,
-    },
+    core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
         account::{AccountsError, load_session},
         config::LoadConfigError,

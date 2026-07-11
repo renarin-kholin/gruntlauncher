@@ -1,9 +1,6 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use url::form_urlencoded::parse;
 
 use crate::{
     assets::{VSAUTH, VSAUTHVALIDATE},
@@ -86,7 +83,7 @@ pub async fn load_session() -> Result<AccountStore> {
     //TODO: check if the session is valid or expired
     Ok(toml::from_str(&session_file_content)?)
 }
-pub async fn save_session(account: Account) -> Result<()> {
+pub async fn save_account(account: Account) -> Result<()> {
     let data_dir = paths::data_dir()?;
     tokio::fs::create_dir_all(&data_dir).await?;
     let session_path = data_dir.join("session.toml");
@@ -94,13 +91,20 @@ pub async fn save_session(account: Account) -> Result<()> {
     if let Some(existing) = accounts_store
         .accounts
         .iter_mut()
-        .find(|a| a.email == account.email)
+        .find(|a| a.username == account.username)
     {
         *existing = account.clone();
     } else {
         accounts_store.accounts.push(account.clone());
     }
     accounts_store.selected_account = Some(account.username.clone());
+    tokio::fs::write(session_path, toml::to_string(&accounts_store)?).await?;
+    Ok(())
+}
+pub async fn save_accounts(accounts_store: AccountStore) -> Result<()> {
+    let data_dir = paths::data_dir()?;
+    tokio::fs::create_dir_all(&data_dir).await?;
+    let session_path = data_dir.join("session.toml");
     tokio::fs::write(session_path, toml::to_string(&accounts_store)?).await?;
     Ok(())
 }
@@ -136,7 +140,7 @@ pub async fn send_login(
                     .ok_or(AccountsError::ParseError)?,
                 parsed_response.uid.ok_or(AccountsError::ParseError)?,
             );
-            save_session(account.clone()).await?;
+            save_account(account.clone()).await?;
             Ok(LoginStatus::Success(account))
         }
         _ => {
@@ -169,12 +173,8 @@ pub async fn validate_session(account: Account) -> Result<bool> {
     params.insert("uid", account.uid);
     params.insert("sessionkey", account.sessionkey);
 
-    debug!("{:?}", params);
     let response = HTTP.get(VSAUTHVALIDATE).form(&params).send().await?;
-    debug!("{:?}", response);
     let response_text = response.text().await?;
-    debug!("{:?}", response_text);
     let parsed_response: ClientValidateResponse = serde_json::from_str(&response_text)?;
-    debug!("{:?}", parsed_response);
     Ok(parsed_response.valid == 1)
 }

@@ -142,18 +142,19 @@ where
         let state = tree.state.downcast_mut::<SwitcherState>();
 
         if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event
-            && cursor.is_over(layout.bounds()) {
-                if self.accounts.is_empty() {
-                    if let Some(on_login) = &self.on_login {
-                        shell.publish(on_login(LoginRequest::AddAccount));
-                    }
-                } else {
-                    state.open = !state.open;
-                    state.confirm_remove = None;
+            && cursor.is_over(layout.bounds())
+        {
+            if self.accounts.is_empty() {
+                if let Some(on_login) = &self.on_login {
+                    shell.publish(on_login(LoginRequest::AddAccount));
                 }
-                shell.capture_event();
-                shell.request_redraw();
+            } else {
+                state.open = !state.open;
+                state.confirm_remove = None;
             }
+            shell.capture_event();
+            shell.request_redraw();
+        }
     }
 
     fn mouse_interaction(
@@ -483,12 +484,12 @@ where
                     return;
                 }
 
-                //if self.footer_rect(bounds).contains(pos) {
-                //    self.close();
-                //    if let Some(on_login) = self.on_login {
-                //        shell.publish(on_login(LoginRequest::AddAccount));
-                //    }
-                //}
+                if self.footer_rect(bounds).contains(pos) {
+                    self.close();
+                    if let Some(on_login) = self.on_login {
+                        shell.publish(on_login(LoginRequest::AddAccount));
+                    }
+                }
                 shell.capture_event();
                 shell.request_redraw();
             }

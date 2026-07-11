@@ -13,16 +13,18 @@ use tracing::{debug, error, info};
 use crate::{
     assets::GRUNT_ICON,
     core::{
-        account::AccountStatus,
+        account::{AccountStatus, AccountStore},
         instance::{GruntInstance, InstanceId},
     },
     services::{
-        account::{AccountsError, LoginStatus, save_session, send_login, validate_session},
+        account::{
+            AccountsError, LoginStatus, save_account, save_accounts, send_login, validate_session,
+        },
         instance::{self, InstancesError},
     },
     ui::{
         GruntAction, GruntState,
-        views::ScreenOutput,
+        views::{ScreenOutput, home::Message::LoginResult},
         widget::{
             account::{self, LoginRequest},
             overlay::overlay_container,
@@ -267,7 +269,7 @@ impl Screen {
                 state.selected_account = Some(username.clone());
                 if let Some(account) = state.accounts.iter().find(|a| a.username == username) {
                     return ScreenOutput::task(Task::batch([
-                        Task::perform(save_session(account.clone()), SessionSaved),
+                        Task::perform(save_account(account.clone()), SessionSaved),
                         Task::perform(validate_session(account.clone()), SessionValidated),
                     ]));
                 }
@@ -277,15 +279,26 @@ impl Screen {
                 if state.selected_account.as_deref() == Some(username.as_str()) {
                     state.selected_account = state.accounts.first().map(|a| a.username.clone());
                 }
+                return ScreenOutput::task(Task::perform(
+                    save_accounts(AccountStore {
+                        accounts: state.accounts.clone(),
+                        selected_account: state.selected_account.clone(),
+                    }),
+                    SessionSaved,
+                ));
             }
             LoginRequested(login_request) => {
                 use LoginRequest::*;
                 match login_request {
-                    AddAccount => {
-                        self.show_login = true;
+                    LoginRequest::AddAccount => {
                         self.login_details.clear();
+                        self.show_login = true;
                     }
-                    Relogin(_email) => {}
+                    Relogin(email) => {
+                        self.login_details.clear();
+                        self.login_details.email = email;
+                        self.show_login = true;
+                    }
                 }
             }
             EmailChange(email) => {
@@ -298,27 +311,7 @@ impl Screen {
                 self.login_details.totp = totp;
             }
             DoLogin => {
-                self.login_details.error = None;
-                debug!("Login");
-                //Validate email, totp and then
-                if !EmailAddress::is_valid(&self.login_details.email) {
-                    self.login_details.error = Some("Invalid email. Please try again.".to_string());
-                    return ScreenOutput::none();
-                }
-                let totp = if self.login_details.prelogintoken.is_some() {
-                    Some(self.login_details.totp.clone())
-                } else {
-                    None
-                };
-                return ScreenOutput::task(Task::perform(
-                    send_login(
-                        self.login_details.email.clone(),
-                        self.login_details.password.clone(),
-                        totp,
-                        self.login_details.prelogintoken.clone(),
-                    ),
-                    LoginResult,
-                ));
+                return self.add_account(state);
             }
             CancelLogin => {
                 self.login_details.clear();
@@ -386,7 +379,7 @@ impl Screen {
                             Some("Your login session has expired, login again.".into());
                         self.login_details.email = account.email.clone();
                         return ScreenOutput::task(Task::perform(
-                            save_session(account.clone()),
+                            save_account(account.clone()),
                             SessionSaved,
                         ));
                     }
@@ -395,5 +388,28 @@ impl Screen {
             },
         }
         ScreenOutput::none()
+    }
+    fn add_account(&mut self, _state: &mut GruntState) -> ScreenOutput<Message> {
+        self.login_details.error = None;
+        self.show_login = true;
+        //Validate email, totp and then
+        if !EmailAddress::is_valid(&self.login_details.email) {
+            self.login_details.error = Some("Invalid email. Please try again.".to_string());
+            return ScreenOutput::none();
+        }
+        let totp = if self.login_details.prelogintoken.is_some() {
+            Some(self.login_details.totp.clone())
+        } else {
+            None
+        };
+        ScreenOutput::task(Task::perform(
+            send_login(
+                self.login_details.email.clone(),
+                self.login_details.password.clone(),
+                totp,
+                self.login_details.prelogintoken.clone(),
+            ),
+            LoginResult,
+        ))
     }
 }
