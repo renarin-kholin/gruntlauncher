@@ -49,13 +49,12 @@ pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance
     let mut instances = vec![];
     while let Some(entry) = dir.next().await {
         let entry = entry?;
-        debug!("{:?}", entry);
         if let Ok(instance_config) =
             tokio::fs::read_to_string(entry.path().join("instance.toml")).await
         {
-            match toml::from_str(&instance_config) {
+            match toml::from_str::<GruntInstance>(&instance_config) {
                 Ok(instance) => {
-                    info!("Loaded instance config: {:?}", instance);
+                    info!("Loaded instance config: {}", instance.name);
                     instances.push(instance)
                 }
                 Err(e) => {

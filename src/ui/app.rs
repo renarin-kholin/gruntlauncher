@@ -57,7 +57,7 @@ impl GruntLauncher {
             },
             Task::batch([
                 Task::perform(
-                    async move { crate::services::config::load_config() },
+                    crate::services::config::load_config(),
                     GruntMessage::ConfigLoaded,
                 ),
                 Task::perform(load_session(), GruntMessage::SessionLoaded),
