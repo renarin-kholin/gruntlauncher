@@ -7,7 +7,11 @@ use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
-    core::{account::AccountStore, config::Config, instance::GruntInstance},
+    core::{
+        account::{self, AccountStore},
+        config::Config,
+        instance::GruntInstance,
+    },
     services::{
         account::{load_session, AccountsError},
         config::LoadConfigError,
@@ -116,6 +120,7 @@ impl GruntLauncher {
                 info!("Session info loaded.");
                 match load_result {
                     Ok(account_store) => {
+                        self.state.selected_account = account_store.selected_account;
                         self.state.accounts = account_store.accounts;
                     }
                     Err(e) => {

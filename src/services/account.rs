@@ -72,14 +72,24 @@ pub async fn load_session() -> Result<AccountStore> {
     tokio::fs::create_dir_all(&data_dir).await?;
     let session_path = data_dir.join("session.toml");
     let session_file_content = tokio::fs::read_to_string(session_path).await?;
+    //TODO: check if the session is valid or expired
     Ok(toml::from_str(&session_file_content)?)
 }
-pub async fn save_session(account: &Account) -> Result<()> {
+pub async fn save_session(account: Account) -> Result<()> {
     let data_dir = paths::data_dir()?;
     tokio::fs::create_dir_all(&data_dir).await?;
     let session_path = data_dir.join("session.toml");
     let mut accounts_store = load_session().await.unwrap_or_default();
-    accounts_store.accounts.push(account.clone());
+    if let Some(existing) = accounts_store
+        .accounts
+        .iter_mut()
+        .find(|a| a.email == account.email)
+    {
+        *existing = account.clone();
+    } else {
+        accounts_store.accounts.push(account.clone());
+    }
+    accounts_store.selected_account = Some(account.username.clone());
     tokio::fs::write(session_path, toml::to_string(&accounts_store)?).await?;
     Ok(())
 }
@@ -115,7 +125,7 @@ pub async fn send_login(
                     .ok_or(AccountsError::ParseError)?,
                 parsed_response.uid.ok_or(AccountsError::ParseError)?,
             );
-            save_session(&account).await?;
+            save_session(account.clone()).await?;
             Ok(LoginStatus::Success(account))
         }
         _ => {

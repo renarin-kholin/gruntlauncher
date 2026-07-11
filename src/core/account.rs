@@ -34,7 +34,9 @@ impl Account {
         }
     }
 }
+pub type Username = String;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct AccountStore {
     pub accounts: Vec<Account>,
+    pub selected_account: Option<Username>,
 }

@@ -9,7 +9,7 @@ use iced::{
         text, text_input,
     },
 };
-use tracing::debug;
+use tracing::{debug, error, info};
 
 use crate::{
     assets::GRUNT_ICON,
@@ -18,7 +18,7 @@ use crate::{
         instance::{GruntInstance, InstanceId},
     },
     services::{
-        account::{AccountsError, LoginStatus, send_login},
+        account::{AccountsError, LoginStatus, save_session, send_login},
         instance::{self, InstancesError},
     },
     ui::{
@@ -69,6 +69,7 @@ pub enum Message {
     TOTPChange(String),
     DoLogin,
     CancelLogin,
+    SessionSaved(Result<(), AccountsError>),
 
     LoginResult(Result<LoginStatus, AccountsError>),
 }
@@ -246,10 +247,14 @@ impl Screen {
                         .iter()
                         .find(|i| i.id == selected_instance)
                         .expect("Could not select instance");
+
                     return ScreenOutput::task(Task::perform(
                         instance::launch_instance(
                             instance.clone(),
                             state.config.instances_folder.clone(),
+                            state.selected_account.as_ref().and_then(|s| {
+                                state.accounts.iter().find(|a| a.username == *s).cloned()
+                            }),
                         ),
                         InstanceLaunched,
                     ));
@@ -259,7 +264,13 @@ impl Screen {
                 debug!("{result:?}");
             }
             AccountSelected(username) => {
-                state.selected_account = Some(username);
+                state.selected_account = Some(username.clone());
+                if let Some(account) = state.accounts.iter().find(|a| a.username == username) {
+                    return ScreenOutput::task(Task::perform(
+                        save_session(account.clone()),
+                        SessionSaved,
+                    ));
+                }
             }
             AccountRemove(username) => {
                 state.accounts.retain(|a| a.username != username);
@@ -269,7 +280,6 @@ impl Screen {
             }
             LoginRequested(login_request) => {
                 use LoginRequest::*;
-                debug!("{:?}", login_request);
                 match login_request {
                     AddAccount => {
                         self.show_login = true;
@@ -295,7 +305,7 @@ impl Screen {
                     self.login_details.error = Some("Invalid email. Please try again.".to_string());
                     return ScreenOutput::none();
                 }
-                let (totp) = if self.login_details.prelogintoken.is_some() {
+                let totp = if self.login_details.prelogintoken.is_some() {
                     Some(self.login_details.totp.clone())
                 } else {
                     None
@@ -343,6 +353,10 @@ impl Screen {
                     Err(e) => self.login_details.error = Some(e.to_string()),
                 }
             }
+            SessionSaved(result) => match result {
+                Ok(()) => info!("Updated session"),
+                Err(e) => error!("{e}"),
+            },
         }
         ScreenOutput::none()
     }
