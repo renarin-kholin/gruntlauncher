@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0](https://github.com/renarin-kholin/gruntlauncher/releases/tag/v0.1.0) - 2026-07-11
+## [0.1.1](https://github.com/renarin-kholin/gruntlauncher/releases/tag/v0.1.1) - 2026-07-11
+
+Note: v0.1.0 was skipped — GitHub's immutable-release feature permanently
+reserved that tag name after an earlier failed release attempt, with no
+release actually published under it.
 
 ### Added
 
