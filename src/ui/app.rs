@@ -1,23 +1,24 @@
 use iced::{
-    Element, Size, Task,
     widget::image::Handle,
     window::{icon, settings::PlatformSpecific},
+    Element, Size, Task,
 };
 use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
-    core::{config::Config, instance::GruntInstance},
+    core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
+        account::{load_session, AccountsError},
         config::LoadConfigError,
-        image::{DecodedImage, ImagesError, load_image},
+        image::{load_image, DecodedImage, ImagesError},
         instance::InstancesError,
     },
     ui::{
-        GruntState,
         theme::grunt_theme,
-        views::{Screen, add_instance, home},
+        views::{add_instance, home, Screen},
         widget::overlay::overlay_container,
+        GruntState,
     },
 };
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
@@ -29,6 +30,7 @@ pub enum GruntMessage {
     InstancesLoaded(Result<Vec<GruntInstance>, InstancesError>),
     ConfigLoaded(Result<Config, LoadConfigError>),
     ImageLoaded(Result<DecodedImage, ImagesError>, i64),
+    SessionLoaded(Result<AccountStore, AccountsError>),
 }
 
 pub enum GruntAction {
@@ -53,10 +55,13 @@ impl GruntLauncher {
                 home: home::Screen::new(),
                 state: GruntState::default(),
             },
-            Task::perform(
-                async move { crate::services::config::load_config() },
-                GruntMessage::ConfigLoaded,
-            ),
+            Task::batch([
+                Task::perform(
+                    async move { crate::services::config::load_config() },
+                    GruntMessage::ConfigLoaded,
+                ),
+                Task::perform(load_session(), GruntMessage::SessionLoaded),
+            ]),
         )
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
@@ -103,6 +108,18 @@ impl GruntLauncher {
                     }
                     Err(e) => {
                         error!("Error while loading image: {:?}", e);
+                    }
+                }
+                Task::none()
+            }
+            SessionLoaded(load_result) => {
+                info!("Session info loaded.");
+                match load_result {
+                    Ok(account_store) => {
+                        self.state.accounts = account_store.accounts;
+                    }
+                    Err(e) => {
+                        error!("Error while loading accounts store: {}", e);
                     }
                 }
                 Task::none()

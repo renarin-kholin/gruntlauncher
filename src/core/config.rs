@@ -11,19 +11,13 @@ use crate::{
 pub struct Config {
     pub instances_folder: PathBuf,
     pub installations_folder: PathBuf,
-    pub accounts: Vec<Account>,
 }
 
 impl Config {
-    pub fn new(
-        instances_folder: PathBuf,
-        installations_folder: PathBuf,
-        accounts: Vec<Account>,
-    ) -> Self {
+    pub fn new(instances_folder: PathBuf, installations_folder: PathBuf) -> Self {
         Config {
             instances_folder,
             installations_folder,
-            accounts,
         }
     }
 }
@@ -31,10 +25,6 @@ impl Default for Config {
     fn default() -> Self {
         let project_dirs = paths::dirs().expect("Could not fetch default paths.");
         let data_dir = project_dirs.data_dir();
-        Self::new(
-            data_dir.join("instances"),
-            data_dir.join("installations"),
-            vec![],
-        )
+        Self::new(data_dir.join("instances"), data_dir.join("installations"))
     }
 }

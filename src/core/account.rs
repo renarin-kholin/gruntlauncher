@@ -34,3 +34,7 @@ impl Account {
         }
     }
 }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AccountStore {
+    pub accounts: Vec<Account>,
+}
