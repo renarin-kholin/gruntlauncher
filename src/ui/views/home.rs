@@ -52,6 +52,9 @@ pub struct Screen {
     //Login form state
     show_login: bool,
     login_details: LoginDetail,
+
+    //Set while confirming removal of an account; drives the confirmation modal.
+    pending_remove: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +66,9 @@ pub enum Message {
 
     //Login Related
     AccountSelected(String),
-    AccountRemove(String),
+    AccountRemoveRequested(String),
+    ConfirmAccountRemove,
+    CancelAccountRemove,
     LoginRequested(LoginRequest),
     EmailChange(String),
     PasswordChange(String),
@@ -91,6 +96,7 @@ impl Screen {
             //Login Fields
             show_login: false,
             login_details: LoginDetail::default(),
+            pending_remove: None,
         }
     }
 
@@ -164,6 +170,29 @@ impl Screen {
         ])
         .into()
     }
+    pub fn view_remove_confirm<'a>(&'a self, username: &str) -> Element<'a, Message> {
+        use Message::*;
+        let content = column![
+            text!("Remove {}?", username),
+            text!("You'll need to sign in again to use this account."),
+            space().height(20.0),
+            button(center_x("Remove"))
+                .width(Length::Fill)
+                .style(button::danger)
+                .on_press(ConfirmAccountRemove),
+            button(center_x("Cancel"))
+                .width(Length::Fill)
+                .style(button::subtle)
+                .on_press(CancelAccountRemove),
+        ]
+        .spacing(5.0);
+        center(row![
+            space().width(Length::FillPortion(1)),
+            content.width(Length::FillPortion(2)),
+            space().width(Length::FillPortion(1))
+        ])
+        .into()
+    }
     pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         let mut accounts = column![];
@@ -174,7 +203,7 @@ impl Screen {
                 account::AccountSwitcher::new(&state.accounts, state.selected_account.as_deref())
                     .on_login(LoginRequested)
                     .on_select(AccountSelected)
-                    .on_remove(AccountRemove),
+                    .on_remove(AccountRemoveRequested),
             )
         };
         let base = column![
@@ -225,12 +254,17 @@ impl Screen {
         ]
         .height(Length::Fill)
         .width(Length::Fill);
-        let panel_children = if self.show_login {
-            Some(self.view_login(state))
+        let (panel_children, panel_title) = if let Some(username) = &self.pending_remove {
+            (
+                Some(self.view_remove_confirm(username)),
+                Some("Remove account".to_string()),
+            )
+        } else if self.show_login {
+            (Some(self.view_login(state)), Some("Login".to_string()))
         } else {
-            None
+            (None, None)
         };
-        overlay_container(base.into(), panel_children, Some("Login".to_string()))
+        overlay_container(base.into(), panel_children, panel_title)
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
@@ -274,18 +308,26 @@ impl Screen {
                     ]));
                 }
             }
-            AccountRemove(username) => {
-                state.accounts.retain(|a| a.username != username);
-                if state.selected_account.as_deref() == Some(username.as_str()) {
-                    state.selected_account = state.accounts.first().map(|a| a.username.clone());
+            AccountRemoveRequested(username) => {
+                self.pending_remove = Some(username);
+            }
+            CancelAccountRemove => {
+                self.pending_remove = None;
+            }
+            ConfirmAccountRemove => {
+                if let Some(username) = self.pending_remove.take() {
+                    state.accounts.retain(|a| a.username != username);
+                    if state.selected_account.as_deref() == Some(username.as_str()) {
+                        state.selected_account = state.accounts.first().map(|a| a.username.clone());
+                    }
+                    return ScreenOutput::task(Task::perform(
+                        save_accounts(AccountStore {
+                            accounts: state.accounts.clone(),
+                            selected_account: state.selected_account.clone(),
+                        }),
+                        SessionSaved,
+                    ));
                 }
-                return ScreenOutput::task(Task::perform(
-                    save_accounts(AccountStore {
-                        accounts: state.accounts.clone(),
-                        selected_account: state.selected_account.clone(),
-                    }),
-                    SessionSaved,
-                ));
             }
             LoginRequested(login_request) => {
                 use LoginRequest::*;

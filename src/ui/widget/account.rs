@@ -30,7 +30,6 @@ const TEXT_SIZE: f32 = 13.0;
 #[derive(Default)]
 struct SwitcherState {
     open: bool,
-    confirm_remove: Option<String>,
 }
 
 pub struct AccountSwitcher<'a, Message> {
@@ -57,7 +56,7 @@ impl<'a, Message> AccountSwitcher<'a, Message> {
         self
     }
 
-    //Emitted after the inline confirmation, so the app can remove directly.
+    //Emitted immediately when the ✕ is clicked; the app is responsible for confirming.
     pub fn on_remove(mut self, f: impl Fn(String) -> Message + 'a) -> Self {
         self.on_remove = Some(Box::new(f));
         self
@@ -150,7 +149,6 @@ where
                 }
             } else {
                 state.open = !state.open;
-                state.confirm_remove = None;
             }
             shell.capture_event();
             shell.request_redraw();
@@ -369,27 +367,8 @@ impl<'a, 'b, Message> Menu<'a, 'b, Message> {
         }
     }
 
-    fn confirm_button_rects(row: Rectangle) -> (Rectangle, Rectangle) {
-        let cancel_w = estimate_width("Cancel", 12.0) + 12.0;
-        let remove_w = estimate_width("Remove", 12.0) + 16.0;
-        let cancel = Rectangle {
-            x: row.x + row.width - 6.0 - cancel_w,
-            y: row.y + (row.height - 20.0) / 2.0,
-            width: cancel_w,
-            height: 20.0,
-        };
-        let remove = Rectangle {
-            x: cancel.x - 6.0 - remove_w,
-            y: cancel.y,
-            width: remove_w,
-            height: 20.0,
-        };
-        (remove, cancel)
-    }
-
     fn close(&mut self) {
         self.state.open = false;
-        self.state.confirm_remove = None;
     }
 }
 
@@ -451,19 +430,12 @@ where
                         continue;
                     }
 
-                    if self.state.confirm_remove.as_deref() == Some(acc.username.as_str()) {
-                        let (remove, cancel) = Self::confirm_button_rects(row);
-                        if remove.contains(pos) {
-                            let name = acc.username.clone();
-                            self.state.confirm_remove = None;
-                            if let Some(on_remove) = self.on_remove {
-                                shell.publish(on_remove(name));
-                            }
-                        } else if cancel.contains(pos) {
-                            self.state.confirm_remove = None;
+                    if Self::x_button_rect(row).contains(pos) {
+                        let name = acc.username.clone();
+                        self.close();
+                        if let Some(on_remove) = self.on_remove {
+                            shell.publish(on_remove(name));
                         }
-                    } else if Self::x_button_rect(row).contains(pos) {
-                        self.state.confirm_remove = Some(acc.username.clone());
                     } else if acc.status == AccountStatus::Expired
                         && Self::relogin_rect(row).contains(pos)
                     {
@@ -564,80 +536,6 @@ where
             let row = self.row_rect(bounds, i);
             let cy = row.y + row.height / 2.0;
             let is_active = Some(acc.username.as_str()) == self.active;
-            let confirming = self.state.confirm_remove.as_deref() == Some(acc.username.as_str());
-
-            if confirming {
-                // Inline "Remove {name}?" confirmation row.
-                renderer.fill_quad(
-                    Quad {
-                        bounds: row,
-                        border: Border {
-                            radius: 4.0.into(),
-                            ..Border::default()
-                        },
-                        ..Quad::default()
-                    },
-                    palette.danger.weak.color,
-                );
-                fill_label(
-                    renderer,
-                    &format!("Remove {}?", acc.username),
-                    Point::new(row.x + 10.0, cy),
-                    12.5,
-                    palette.danger.weak.text,
-                    text::Alignment::Left,
-                    bounds,
-                );
-
-                let (remove, cancel) = Self::confirm_button_rects(row);
-                let remove_hovered = cursor_pos.is_some_and(|p| remove.contains(p));
-                let (remove_bg, remove_fg) = if remove_hovered {
-                    (palette.danger.base.color, palette.danger.base.text)
-                } else {
-                    (Color::TRANSPARENT, palette.danger.base.text)
-                };
-                renderer.fill_quad(
-                    Quad {
-                        bounds: remove,
-                        border: Border {
-                            color: if remove_hovered {
-                                palette.danger.base.color
-                            } else {
-                                palette.danger.base.text
-                            },
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Quad::default()
-                    },
-                    remove_bg,
-                );
-                fill_label(
-                    renderer,
-                    "Remove",
-                    Point::new(remove.x + remove.width / 2.0, cy),
-                    12.0,
-                    remove_fg,
-                    text::Alignment::Center,
-                    bounds,
-                );
-
-                let cancel_hovered = cursor_pos.is_some_and(|p| cancel.contains(p));
-                fill_label(
-                    renderer,
-                    "Cancel",
-                    Point::new(cancel.x + cancel.width / 2.0, cy),
-                    12.0,
-                    if cancel_hovered {
-                        palette.background.base.text
-                    } else {
-                        palette.background.weak.text
-                    },
-                    text::Alignment::Center,
-                    bounds,
-                );
-                continue;
-            }
 
             let hovered = cursor_pos.is_some_and(|p| row.contains(p));
             if is_active {
