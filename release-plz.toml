@@ -1,12 +1,13 @@
 [workspace]
 changelog_update = true
-git_release_enable = true
+git_release_enable = false
 
+# Create tags but NOT GitHub releases (dist handles releases + binaries)
 [[package]]
 name = "gruntlauncher"
 publish = false
 git_tag_enable = true
-git_release_enable = true
+git_release_enable = false
 git_tag_name = "v{{ version }}"
 
 [[package]]
