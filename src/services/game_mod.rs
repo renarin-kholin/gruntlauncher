@@ -3,7 +3,7 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 use serde::{Deserialize, Serialize};
 use sipper::StreamExt;
 use thiserror::Error;
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{assets::VSMODDB, core::version::GameVersion, services::HTTP};
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,8 +28,8 @@ pub struct ModListEntry {
     #[serde(rename = "type")]
     pub mod_type: Type,
     pub logo: Option<String>,
-    pub tags: Vec<String>,
-    pub lastreleased: String,
+    //pub tags: Vec<Option<String>>,
+    //pub lastreleased: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,7 +50,7 @@ pub struct ModDetail {
     pub logofilename: Option<String>,
     pub logofile: Option<String>,
     // pub logofiledb: String,
-    pub homepageurl: String,
+    pub homepageurl: Option<String>,
     // pub sourcecodeurl: String,
     // pub trailervideourl: Option<String>,
     // pub issuetrackerurl: Option<String>,
@@ -65,7 +65,7 @@ pub struct ModDetail {
     pub created: String,
     pub lastreleased: String,
     pub lastmodified: String,
-    pub tags: Vec<String>,
+    pub tags: Vec<Option<String>>,
     pub releases: Vec<Release>,
     pub screenshots: Vec<Screenshot>,
 }
@@ -75,10 +75,10 @@ pub struct Release {
     pub releaseid: i64,
     pub mainfile: String,
     pub filename: String,
-    pub fileid: i64,
+    pub fileid: Option<i64>,
     pub downloads: i64,
     pub tags: Vec<semver::Version>,
-    pub modidstr: String,
+    pub modidstr: Option<String>,
     pub modversion: semver::Version,
     pub created: String,
     // pub changelog: String,
@@ -201,7 +201,7 @@ pub async fn get_mod_details(mod_id: String) -> Result<Box<ModDetail>> {
         .join("mod/")?
         .join(&mod_id)?;
     let response = HTTP.get(url).send().await?;
-    let parsed_response: ModDetailResponse = response.json().await?;
+    let parsed_response = response.json::<ModDetailResponse>().await?;
     Ok(Box::new(parsed_response.moddetails))
 }
 #[derive(Debug, Clone)]
@@ -254,4 +254,26 @@ pub async fn download_mod(
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn mod_request_deserializes() {
+        let url = reqwest::Url::from_str(VSMODDB)
+            .unwrap()
+            .join("mod/")
+            .unwrap()
+            .join("775")
+            .unwrap();
+        let response = HTTP.get(url).send().await.unwrap();
+        let text = response.text().await.unwrap();
+        let parsed_response = serde_path_to_error::deserialize::<_, ModDetailResponse>(
+            &mut serde_json::Deserializer::from_str(&text),
+        );
+        println!("{:?}", parsed_response);
+        assert!(parsed_response.is_ok())
+    }
 }
