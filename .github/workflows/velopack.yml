@@ -1,0 +1,84 @@
+name: Velopack
+
+# Runs on the tag created when the release-please PR is merged (pushed with a
+# PAT, which is what allows it to trigger this workflow). Builds Velopack
+# packages (Windows Setup.exe, Linux AppImage) and attaches them to the
+# GitHub Release that release-please already created.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: write
+
+env:
+  PACK_ID: GruntLauncher
+  PACK_TITLE: Grunt Launcher
+
+jobs:
+  pack:
+    name: Velopack (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            exe: gruntlauncher.exe
+            icon: assets/icons/logo.ico
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            exe: gruntlauncher
+            icon: assets/icons/logo.png
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install mold (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold clang pkg-config libfontconfig1-dev
+
+      # Explicit --target keeps the output path deterministic
+      # (target/<triple>/release) regardless of any local cargo config.
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Stage pack directory
+        run: |
+          mkdir vpk-stage
+          cp "target/${{ matrix.target }}/release/${{ matrix.exe }}" vpk-stage/
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
+
+      # Fetches the previous Velopack release so a delta package can be
+      # built. Tolerates failure: the first Velopack release has nothing
+      # to download, so only full packages are produced.
+      - name: Download previous release
+        continue-on-error: true
+        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Pack
+        run: |
+          vpk pack \
+            -u "$PACK_ID" \
+            -v "${GITHUB_REF_NAME#v}" \
+            -p vpk-stage \
+            -e "${{ matrix.exe }}" \
+            --packTitle "$PACK_TITLE" \
+            --icon "${{ matrix.icon }}"
+
+      - name: Upload to GitHub Release
+        run: |
+          vpk upload github \
+            --repoUrl "https://github.com/${{ github.repository }}" \
+            --token "${{ secrets.GITHUB_TOKEN }}" \
+            --merge \
+            --tag "$GITHUB_REF_NAME" \
+            --releaseName "$GITHUB_REF_NAME"
