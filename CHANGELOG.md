@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6](https://github.com/renarin-kholin/gruntlauncher/compare/v0.1.5...v0.1.6) (2026-07-12)
+
+
+### Features
+
+* add velopack auto updates ([#19](https://github.com/renarin-kholin/gruntlauncher/issues/19)) ([a219bee](https://github.com/renarin-kholin/gruntlauncher/commit/a219bee437f5512d43bd299365bef13c3ecf0717))
+
 ## [0.1.5](https://github.com/renarin-kholin/gruntlauncher/compare/v0.1.4...v0.1.5) (2026-07-12)
 
 
