@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/renarin-kholin/gruntlauncher/releases/tag/v0.1.3) - 2026-07-12
+
+Note: this version was bumped manually. A prior manual edit to `Cargo.toml`
+left the version "stuck" at 0.1.2 (already tagged), which made release-plz
+treat it as already released and stop computing further bumps from new
+commits. See `release-plz.toml`/`release-plz.yml` for the fix that prevents
+this going forward.
+
+### Added
+
+- *(ui)* Add more buttons on sidebar
+
+### Fixed
+
+- *(ci)* Match a proven release-plz + dist setup
+
 ## [0.1.2](https://github.com/renarin-kholin/gruntlauncher/releases/tag/v0.1.2) - 2026-07-11
 
 ### Added
