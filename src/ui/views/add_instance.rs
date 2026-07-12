@@ -426,7 +426,7 @@ impl Screen {
         } else {
             Some(self.view_progress_overlay())
         };
-        overlay_container(base.into(), child, Some("Adding instance".into()))
+        overlay_container(base.into(), child, Some("Adding instance".into()), None)
     }
     fn mod_item<'a>(
         &'a self,

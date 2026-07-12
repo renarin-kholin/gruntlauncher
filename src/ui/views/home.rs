@@ -64,6 +64,8 @@ pub enum Message {
     InstanceLaunched(Result<(), InstancesError>),
     AddInstance,
 
+    OpenSettings,
+
     //Login Related
     AccountSelected(String),
     AccountRemoveRequested(String),
@@ -257,7 +259,7 @@ impl Screen {
             row![
                 button("Add Instance").on_press(Message::AddInstance),
                 rule::vertical(2),
-                button("Settings"),
+                button("Settings").on_press(Message::OpenSettings),
                 right({
                     let mut right_side = row![].spacing(10.0).align_y(Vertical::Center);
                     if let Some(update) = &state.available_update {
@@ -305,7 +307,7 @@ impl Screen {
         } else {
             (None, None)
         };
-        overlay_container(base.into(), panel_children, panel_title)
+        overlay_container(base.into(), panel_children, panel_title, None)
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
@@ -501,6 +503,9 @@ impl Screen {
             }
             Message::ApplyUpdate => {
                 return ScreenOutput::action(GruntAction::ApplyUpdate);
+            }
+            Message::OpenSettings => {
+                return ScreenOutput::action(GruntAction::OpenSettings);
             }
         }
         ScreenOutput::none()

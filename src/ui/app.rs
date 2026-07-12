@@ -1,7 +1,7 @@
 use iced::{
-    Element, Size, Task,
     widget::image::Handle,
     window::{icon, settings::PlatformSpecific},
+    Element, Size, Task,
 };
 use tracing::{error, info};
 
@@ -9,17 +9,17 @@ use crate::{
     assets::GRUNT_ICON,
     core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
-        account::{AccountsError, load_session},
+        account::{load_session, AccountsError},
         config::LoadConfigError,
-        image::{DecodedImage, ImagesError, load_image},
+        image::{load_image, DecodedImage, ImagesError},
         instance::InstancesError,
-        update::{UpdatesError, check_for_update, download_and_apply},
+        update::{check_for_update, download_and_apply, UpdatesError},
     },
     ui::{
-        GruntState,
         theme::grunt_theme,
-        views::{Screen, add_instance, home},
+        views::{add_instance, home, settings, Screen},
         widget::overlay::overlay_container,
+        GruntState,
     },
 };
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
@@ -27,6 +27,8 @@ const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
 pub enum GruntMessage {
     HomeMessage(home::Message),
     AddInstanceMessage(add_instance::Message),
+    SettingsMessage(settings::Message),
+    CloseScreen,
 
     InstancesLoaded(Result<Vec<GruntInstance>, InstancesError>),
     ConfigLoaded(Result<Config, LoadConfigError>),
@@ -39,6 +41,7 @@ pub enum GruntMessage {
 
 pub enum GruntAction {
     OpenAddInstance,
+    OpenSettings,
     CloseScreen,
     CreateInstance(GruntInstance),
 
@@ -78,8 +81,9 @@ impl GruntLauncher {
             Some(overlay) => {
                 let panel = match overlay {
                     Screen::AddInstance(s) => s.view(&self.state).map(AddInstanceMessage),
+                    Screen::Settings(s) => s.view(&self.state).map(SettingsMessage),
                 };
-                overlay_container(base, Some(panel), Some(overlay.title()))
+                overlay_container(base, Some(panel), Some(overlay.title()), Some(CloseScreen))
             }
         }
     }
@@ -161,6 +165,17 @@ impl GruntLauncher {
                     out.task.map(AddInstanceMessage),
                 ])
             }
+            SettingsMessage(m) if let Some(Settings(s)) = &mut self.overlay => {
+                let out = s.update(m, &mut self.state);
+                Task::batch([
+                    self.handle_actions(out.actions),
+                    out.task.map(SettingsMessage),
+                ])
+            }
+            CloseScreen => {
+                self.overlay = None;
+                Task::none()
+            }
             _ => Task::none(),
         }
     }
@@ -169,8 +184,13 @@ impl GruntLauncher {
         match action {
             OpenAddInstance => {
                 let (screen, task) = add_instance::Screen::new(&mut self.state);
-                self.overlay = Some(Screen::AddInstance(screen));
+                self.overlay = Some(Screen::AddInstance(Box::new(screen)));
                 return task.map(GruntMessage::AddInstanceMessage);
+            }
+            OpenSettings => {
+                let (screen, task) = settings::Screen::new(&mut self.state);
+                self.overlay = Some(Screen::Settings(Box::new(screen)));
+                return task.map(GruntMessage::SettingsMessage);
             }
             CloseScreen => {
                 self.overlay = None;
