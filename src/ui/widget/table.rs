@@ -41,10 +41,15 @@ pub struct Table<'a, Message> {
     header_height: f32,
     row_height: f32,
     divider_grab_width: f32,
+    selected_row: Option<usize>,
 }
 
 impl<'a, Message> Table<'a, Message> {
-    pub fn new(columns: &'a [TableColumn], rows: &'a [Vec<String>]) -> Self {
+    pub fn new(
+        columns: &'a [TableColumn],
+        rows: &'a [Vec<String>],
+        selected_row: Option<usize>,
+    ) -> Self {
         Self {
             columns,
             rows,
@@ -52,6 +57,7 @@ impl<'a, Message> Table<'a, Message> {
             header_height: 36.0,
             row_height: 32.0,
             divider_grab_width: 8.0,
+            selected_row,
         }
     }
     pub fn on_select(mut self, f: impl Fn(usize) -> Message + 'a) -> Self {
@@ -74,7 +80,6 @@ const MIN_THUMB_H: f32 = 24.0;
 #[derive(Clone)]
 struct TableState {
     column_widths: Vec<f32>,
-    selected_row: Option<usize>,
     hovered_row: Option<usize>,
     hovered_divider: Option<usize>,
     resizing: Option<ColumnResize>,
@@ -85,7 +90,6 @@ impl TableState {
     pub fn new() -> Self {
         Self {
             column_widths: vec![],
-            selected_row: None,
             hovered_row: None,
             hovered_divider: None,
             resizing: None,
@@ -214,7 +218,7 @@ where
                 if row_y + self.row_height < body.y || row_y > body.y + body.height {
                     continue;
                 }
-                let row_bg = if state.selected_row == Some(row_idx) {
+                let row_bg = if self.selected_row == Some(row_idx) {
                     theme.extended_palette().background.stronger
                 } else if state.hovered_row == Some(row_idx) {
                     theme.extended_palette().background.weaker
@@ -470,7 +474,6 @@ where
                     n_rows,
                     state.scroll,
                 ) {
-                    state.selected_row = Some(row);
                     if let Some(ref on_select) = self.on_select {
                         shell.publish(on_select(row));
                     }
