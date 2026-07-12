@@ -3,7 +3,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::task::JoinError;
 use tracing::info;
-use velopack::{sources, Error as VelopackError, UpdateCheck, UpdateInfo, UpdateManager};
+use velopack::{Error as VelopackError, UpdateCheck, UpdateInfo, UpdateManager, sources};
 
 #[derive(Clone, Debug, Error)]
 pub enum UpdatesError {
