@@ -13,6 +13,7 @@ use crate::{
         config::LoadConfigError,
         image::{DecodedImage, ImagesError, load_image},
         instance::InstancesError,
+        update::{UpdatesError, check_for_update, download_and_apply},
     },
     ui::{
         GruntState,
@@ -31,6 +32,9 @@ pub enum GruntMessage {
     ConfigLoaded(Result<Config, LoadConfigError>),
     ImageLoaded(Result<DecodedImage, ImagesError>, i64),
     SessionLoaded(Result<AccountStore, AccountsError>),
+    UpdateChecked(Result<Option<Box<velopack::UpdateInfo>>, UpdatesError>),
+    //Only reachable on failure: applying an update successfully exits the process.
+    UpdateApplied(Result<(), UpdatesError>),
 }
 
 pub enum GruntAction {
@@ -39,6 +43,7 @@ pub enum GruntAction {
     CreateInstance(GruntInstance),
 
     GetImage { id: i64, url: String },
+    ApplyUpdate,
 }
 
 pub struct GruntLauncher {
@@ -61,6 +66,7 @@ impl GruntLauncher {
                     GruntMessage::ConfigLoaded,
                 ),
                 Task::perform(load_session(), GruntMessage::SessionLoaded),
+                Task::perform(check_for_update(), GruntMessage::UpdateChecked),
             ]),
         )
     }
@@ -112,6 +118,23 @@ impl GruntLauncher {
                 }
                 Task::none()
             }
+            UpdateChecked(result) => {
+                match result {
+                    Ok(Some(update)) => {
+                        info!("Update available: {}", update.TargetFullRelease.Version);
+                        self.state.available_update = Some(update);
+                    }
+                    Ok(None) => info!("No update available."),
+                    Err(e) => error!("Error while checking for updates: {}", e),
+                }
+                Task::none()
+            }
+            UpdateApplied(result) => {
+                if let Err(e) = result {
+                    error!("Error while applying update: {}", e);
+                }
+                Task::none()
+            }
             SessionLoaded(load_result) => {
                 info!("Session info loaded.");
                 match load_result {
@@ -159,6 +182,11 @@ impl GruntLauncher {
                 return Task::perform(load_image(url), move |bytes| {
                     GruntMessage::ImageLoaded(bytes, id)
                 });
+            }
+            ApplyUpdate => {
+                if let Some(update) = self.state.available_update.clone() {
+                    return Task::perform(download_and_apply(update), GruntMessage::UpdateApplied);
+                }
             }
         }
         Task::none()

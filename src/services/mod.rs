@@ -5,6 +5,7 @@ pub mod config;
 pub mod game_mod;
 pub mod image;
 pub mod instance;
+pub mod update;
 pub mod version;
 
 pub static HTTP: LazyLock<reqwest::Client> = LazyLock::new(|| {
