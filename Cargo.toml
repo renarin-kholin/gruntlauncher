@@ -29,6 +29,7 @@ iced_aw = { version = "0.14.0", features = ["full"] }
 iced_blitzview = { path = "crates/iced_blitzview"}
 image = "0.25.6"
 lru = "0.18.0"
+open = "5.4.0"
 reqwest = { version = "0.13.4", features = ["json", "stream", "query"] }
 semver = "1.0.28"
 serde = "1.0.228"

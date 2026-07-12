@@ -4,8 +4,8 @@ use iced::{
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
-        self, button, center, center_x, column, image::Handle, right, row, rule, scrollable, space,
-        text, text_input,
+        self, Column, button, center, center_x, column, image::Handle, right, row, rule,
+        scrollable, space, text, text_input,
     },
 };
 use tracing::{debug, error, info};
@@ -77,8 +77,11 @@ pub enum Message {
     CancelLogin,
     SessionSaved(Result<(), AccountsError>),
     SessionValidated(Result<bool, AccountsError>),
-
     LoginResult(Result<LoginStatus, AccountsError>),
+
+    //Folders
+    OpenInstanceFolder,
+    OpenModFolder,
 }
 
 impl Default for Screen {
@@ -193,6 +196,47 @@ impl Screen {
         ])
         .into()
     }
+    pub fn view_sidebar<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
+        use Message::*;
+        let mut sidebar: Column<'a, Message> = column![]
+            .align_x(Horizontal::Center)
+            .width(Length::FillPortion(1))
+            .spacing(10.0)
+            .padding(padding::all(10.0));
+        if let Some(selected_instance) = self.selected_instance
+            && let Some(i) = state.instances.iter().find(|i| i.id == selected_instance)
+        {
+            sidebar = sidebar
+                .push(
+                    widget::image(self.icon_handles[0].clone())
+                        .height(80.0)
+                        .width(80.0),
+                )
+                .push(text!("{}", i.name).wrapping(text::Wrapping::Glyph).center());
+        } else {
+            sidebar = sidebar.push(text!("No instance selected"));
+        }
+        sidebar
+            .push(
+                button(center_x("Launch"))
+                    .width(Length::Fill)
+                    .on_press_maybe(self.selected_instance.map(|_| LaunchInstance)),
+            )
+            .push(button(center_x("Edit")).width(Length::Fill))
+            .push(rule::horizontal(1.0))
+            .push(text!("Open Folders"))
+            .push(
+                button(center_x("Mods"))
+                    .width(Length::Fill)
+                    .on_press_maybe(self.selected_instance.map(|_| OpenModFolder)),
+            )
+            .push(
+                button(center_x("Instance"))
+                    .width(Length::Fill)
+                    .on_press_maybe(self.selected_instance.map(|_| OpenInstanceFolder)),
+            )
+            .into()
+    }
     pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         let mut accounts = column![];
@@ -234,22 +278,7 @@ impl Screen {
                 .width(Length::FillPortion(5)),
                 rule::vertical(1.0),
                 //Sidebar
-                column![
-                    text("Selected instance"),
-                    button("Launch")
-                        .padding(padding::horizontal(30.0).vertical(7.0))
-                        .style(move |theme, mut status| {
-                            if self.selected_instance.is_none() {
-                                status = button::Status::Disabled;
-                            }
-                            button::primary(theme, status)
-                        })
-                        .on_press(Message::LaunchInstance)
-                ]
-                .align_x(Horizontal::Center)
-                .width(Length::FillPortion(1))
-                .spacing(10.0)
-                .padding(padding::all(10.0))
+                self.view_sidebar(state)
             ]
         ]
         .height(Length::Fill)
@@ -428,6 +457,36 @@ impl Screen {
                 }
                 Err(e) => error!("{e}"),
             },
+            OpenInstanceFolder => {
+                if let Some(selected_instance) = self.selected_instance {
+                    let instances_path = state.config.instances_folder.clone();
+                    let instance_folder = instances_path.join(selected_instance.to_string());
+                    match open::that(&instance_folder) {
+                        Ok(()) => {
+                            info!("Opened {:?} in the default application.", instance_folder);
+                        }
+                        Err(e) => {
+                            error!("Error when trying to open a folder: {e}");
+                        }
+                    }
+                }
+            }
+            OpenModFolder => {
+                if let Some(selected_instance) = self.selected_instance {
+                    let instances_path = state.config.instances_folder.clone();
+                    let mod_folder = instances_path
+                        .join(selected_instance.to_string())
+                        .join("Mods");
+                    match open::that(&mod_folder) {
+                        Ok(()) => {
+                            info!("Opened {:?} in the default application.", mod_folder);
+                        }
+                        Err(e) => {
+                            error!("Error when trying to open a folder: {e}");
+                        }
+                    }
+                }
+            }
         }
         ScreenOutput::none()
     }
