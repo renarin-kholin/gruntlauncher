@@ -194,6 +194,13 @@ impl Screen {
             .collect()
     }
 
+    fn if_valid<Message>(&self, message: Message) -> Option<Message> {
+        if !self.name.is_empty() && self.selected_version.is_some() {
+            Some(message)
+        } else {
+            None
+        }
+    }
     fn view_basic<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         let mut page_content = column![];
@@ -224,11 +231,6 @@ impl Screen {
                 .style(container::bordered_box),
             )
         };
-        let next_if_valid = if !self.name.is_empty() && self.selected_version.is_some() {
-            Some(Next)
-        } else {
-            None
-        };
         column![
             //Instance details (name and icon)
             row![
@@ -257,7 +259,7 @@ impl Screen {
             right(
                 row![
                     button("Next")
-                        .on_press_maybe(next_if_valid)
+                        .on_press_maybe(self.if_valid(Next))
                         .style(button::success),
                     button("Cancel").on_press(Cancel).style(button::danger)
                 ]
@@ -670,7 +672,7 @@ impl Screen {
                             button::subtle(theme, status)
                         }),
                     button("2. Mods")
-                        .on_press(Navigate(Step::Mod))
+                        .on_press_maybe(self.if_valid(Navigate(Step::Mod)))
                         .width(Length::Fill)
                         .style(|theme, mut status| {
                             if self.step == Step::Mod {
@@ -679,7 +681,7 @@ impl Screen {
                             button::subtle(theme, status)
                         }),
                     button("3. Review")
-                        .on_press(Navigate(Step::Review))
+                        .on_press_maybe(self.if_valid(Navigate(Step::Review)))
                         .width(Length::Fill)
                         .style(|theme, mut status| {
                             if self.step == Step::Review {
