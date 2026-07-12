@@ -221,9 +221,18 @@ impl Screen {
         } else {
             page_content.push(
                 container(
-                    table::Table::new(&self.columns, &self.rows)
-                        .row_height(30.0)
-                        .on_select(SelectVersion),
+                    table::Table::new(
+                        &self.columns,
+                        &self.rows,
+                        self.selected_version.clone().map(|v| {
+                            self.rows
+                                .iter()
+                                .position(|r| r[0] == v.version.to_string())
+                                .unwrap_or(0)
+                        }),
+                    )
+                    .row_height(30.0)
+                    .on_select(SelectVersion),
                 )
                 .width(Length::Fill)
                 .height(Length::Fill)
