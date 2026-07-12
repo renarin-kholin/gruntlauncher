@@ -1,0 +1,29 @@
+name: Release-please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release-please
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # PAT instead of the default GITHUB_TOKEN so the tag created on
+          # release-PR merge triggers dist's tag-push release workflow
+          # (GitHub does not run workflows for events created by GITHUB_TOKEN).
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
