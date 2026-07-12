@@ -15,6 +15,7 @@ pub struct GruntState {
     pub image_cache: LruCache<i64, iced::widget::image::Handle>,
     pub accounts: Vec<Account>,
     pub selected_account: Option<String>,
+    pub available_update: Option<Box<velopack::UpdateInfo>>,
 }
 impl Default for GruntState {
     fn default() -> Self {
@@ -28,6 +29,7 @@ impl Default for GruntState {
             ),
             accounts: vec![],
             selected_account: None,
+            available_update: None,
         }
     }
 }

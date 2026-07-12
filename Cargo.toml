@@ -2,6 +2,7 @@
 name = "gruntlauncher"
 version = "0.1.5"
 edition = "2024"
+authors = ["Sarvesh Kolte <renarinkholin4@proton.me>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/renarin-kholin/gruntlauncher"
 
@@ -43,6 +44,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 url = "2.5.8"
 uuid = { version = "1.23.2", features = ["v4", "serde"] }
+velopack = "1.2.0"
 webbrowser = "1.2.1"
 
 [target.'cfg(windows)'.dependencies]

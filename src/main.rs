@@ -23,6 +23,9 @@ fn init_tracing() {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 fn main() -> GruntResult<()> {
+    // Must run before anything else: handles Velopack install/update/uninstall
+    // hooks and may exit or restart the process.
+    velopack::VelopackApp::build().run();
     init_tracing();
     ui::app::run()?;
     Ok(())

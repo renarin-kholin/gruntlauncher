@@ -82,6 +82,8 @@ pub enum Message {
     //Folders
     OpenInstanceFolder,
     OpenModFolder,
+
+    ApplyUpdate,
 }
 
 impl Default for Screen {
@@ -256,7 +258,17 @@ impl Screen {
                 button("Add Instance").on_press(Message::AddInstance),
                 rule::vertical(2),
                 button("Settings"),
-                right(accounts)
+                right({
+                    let mut right_side = row![].spacing(10.0).align_y(Vertical::Center);
+                    if let Some(update) = &state.available_update {
+                        right_side = right_side.push(
+                            button(text!("Update to v{}", update.TargetFullRelease.Version))
+                                .style(button::success)
+                                .on_press(ApplyUpdate),
+                        );
+                    }
+                    right_side.push(accounts)
+                })
             ]
             .padding(padding::all(10.0))
             .spacing(10.0)
@@ -486,6 +498,9 @@ impl Screen {
                         }
                     }
                 }
+            }
+            Message::ApplyUpdate => {
+                return ScreenOutput::action(GruntAction::ApplyUpdate);
             }
         }
         ScreenOutput::none()
