@@ -3,7 +3,7 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 use serde::{Deserialize, Serialize};
 use sipper::StreamExt;
 use thiserror::Error;
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::{assets::VSMODDB, core::version::GameVersion, services::HTTP};
 #[derive(Debug, Serialize, Deserialize)]

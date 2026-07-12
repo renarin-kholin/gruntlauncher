@@ -1,12 +1,3 @@
-use iced::advanced::layout;
-use iced::advanced::mouse;
-use iced::advanced::renderer;
-use iced::advanced::text;
-use iced::advanced::widget::tree;
-use iced::advanced::widget::Tree;
-use iced::advanced::Widget;
-use iced::alignment::Horizontal;
-use iced::alignment::Vertical;
 use iced::Element;
 use iced::Event;
 use iced::Length;
@@ -14,6 +5,15 @@ use iced::Pixels;
 use iced::Point;
 use iced::Rectangle;
 use iced::Size;
+use iced::advanced::Widget;
+use iced::advanced::layout;
+use iced::advanced::mouse;
+use iced::advanced::renderer;
+use iced::advanced::text;
+use iced::advanced::widget::Tree;
+use iced::advanced::widget::tree;
+use iced::alignment::Horizontal;
+use iced::alignment::Vertical;
 #[derive(Debug, Clone, PartialEq)]
 pub struct TableColumn {
     pub header: String,
@@ -601,11 +601,7 @@ fn hit_row(
         return None;
     }
     let row = (rel_y / row_h) as usize;
-    if row < n_rows {
-        Some(row)
-    } else {
-        None
-    }
+    if row < n_rows { Some(row) } else { None }
 }
 fn hit_divider(pos: Point, div_xs: &[f32], bounds: Rectangle, grab_w: f32) -> Option<usize> {
     if pos.y < bounds.y || pos.y > bounds.y + bounds.height {
