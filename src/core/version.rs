@@ -14,6 +14,7 @@ pub struct LocalGameVersion {
 pub struct RemoteGameVersion {
     pub filename: String,
     pub url: String,
+    pub checksum: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Hash, Eq, PartialEq)]
@@ -28,10 +29,19 @@ pub struct GameVersion {
     pub source: GameVersionSource,
 }
 impl GameVersion {
-    pub fn remote(version: semver::Version, filename: String, url: String) -> Self {
+    pub fn remote(
+        version: semver::Version,
+        filename: String,
+        url: String,
+        checksum: String,
+    ) -> Self {
         Self {
             version,
-            source: GameVersionSource::Remote(RemoteGameVersion { filename, url }),
+            source: GameVersionSource::Remote(RemoteGameVersion {
+                filename,
+                url,
+                checksum,
+            }),
         }
     }
     pub fn local(version: semver::Version, path: &Path) -> Self {

@@ -1932,6 +1932,7 @@ dependencies = [
  "iced_blitzview",
  "image",
  "lru 0.18.1",
+ "md5",
  "open",
  "reqwest",
  "rfd",
@@ -3201,6 +3202,12 @@ dependencies = [
  "cfg-if",
  "rayon",
 ]
+
+[[package]]
+name = "md5"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ebb8d8732c6a6df3d8f032a82911cfc747e00efb95cc46e8d0acd5b5b88570c"
 
 [[package]]
 name = "memchr"

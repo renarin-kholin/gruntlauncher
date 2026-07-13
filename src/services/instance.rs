@@ -63,7 +63,6 @@ pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance
             }
         }
     }
-
     Ok(instances)
 }
 
