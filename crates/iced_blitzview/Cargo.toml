@@ -1,6 +1,6 @@
 [package]
 name = "iced_blitzview"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 rust-version = "1.89"
 description = "An HTML/CSS view widget for iced, powered by the Blitz engine"
