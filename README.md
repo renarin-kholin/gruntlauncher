@@ -25,7 +25,8 @@ GruntLauncher manages multiple Vintage Story game versions and instances side by
 - [x] **One-step install**: selected mods are downloaded and installed alongside the game version when an instance is created.
 - [x] **Launch from the launcher**: start an instance directly, with its own data and mods directory.
 - [x] **Accounts**: Login using your vintage story game account and use it with any instance without having to login every time.
-- [ ] **Manage Instances and Settings**: Edit the details of your instances and edit global settings.
+- [x] **Manage Settings**: Edit the global settings.
+- [ ] **Manage Instances**: Edit the details of your instances.
 
 
 ## Platform support
@@ -38,8 +39,18 @@ GruntLauncher manages multiple Vintage Story game versions and instances side by
 
 ## Installation
 
-There are no releases as of now. You can build it from the source.
+Grab the latest build from the [releases page](https://github.com/renarin-kholin/gruntlauncher/releases/latest):
 
+| Platform | Recommended | Portable |
+|---|---|---|
+| Windows | [`GruntLauncher-win-Setup.exe`](https://github.com/renarin-kholin/gruntlauncher/releases/latest/download/GruntLauncher-win-Setup.exe) (auto-updates) | `GruntLauncher-win-Portable.zip` |
+| Linux | [`GruntLauncher.AppImage`](https://github.com/renarin-kholin/gruntlauncher/releases/latest/download/GruntLauncher.AppImage) (auto-updates) | `gruntlauncher-x86_64-unknown-linux-gnu.tar.xz` |
+
+On Linux, make the AppImage executable (`chmod +x GruntLauncher.AppImage`) and run it. Distro packages are planned.
+
+> **Note:** if you use AppImageLauncher, prefer "Run once" over integration. AppImageLauncher moves the AppImage to a different location, which prevents the built-in updater from updating the copy you actually launch.
+
+## Building from source
 ### Prerequisites
 
 - [Rust](https://rustup.rs) (stable toolchain, 2024 edition)
