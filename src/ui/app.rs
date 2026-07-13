@@ -1,7 +1,7 @@
 use iced::{
+    Element, Size, Task,
     widget::{center, column, image::Handle, progress_bar, text},
     window::{icon, settings::PlatformSpecific},
-    Element, Size, Task,
 };
 use sipper::sipper;
 use tracing::{error, info};
@@ -10,18 +10,18 @@ use crate::{
     assets::GRUNT_ICON,
     core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
-        account::{load_session, AccountsError},
+        account::{AccountsError, load_session},
         config::ConfigError,
-        image::{load_image, DecodedImage, ImagesError},
+        image::{DecodedImage, ImagesError, load_image},
         instance::InstancesError,
-        update::{check_for_update, download_and_apply, UpdateStatus, UpdatesError},
+        update::{UpdateStatus, UpdatesError, check_for_update, download_and_apply},
     },
     ui::{
+        GruntState,
         app::GruntMessage::{UpdateApplied, UpdateProgress},
         theme::grunt_theme,
-        views::{add_instance, home, settings, Screen},
+        views::{Screen, add_instance, home, settings},
         widget::overlay::overlay_container,
-        GruntState,
     },
 };
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
