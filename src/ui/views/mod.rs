@@ -3,15 +3,18 @@ use iced::Task;
 use crate::ui::GruntAction;
 pub mod add_instance;
 pub mod home;
+pub mod settings;
 //The current actively shown Screen
 pub enum Screen {
-    AddInstance(add_instance::Screen),
+    AddInstance(Box<add_instance::Screen>),
+    Settings(Box<settings::Screen>),
 }
 
 impl Screen {
     pub fn title(&self) -> String {
         match self {
             Screen::AddInstance(_) => "Add a new Instance".to_string(),
+            Screen::Settings(_) => "Settings".to_string(),
         }
     }
 }
