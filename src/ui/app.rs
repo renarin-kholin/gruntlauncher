@@ -1,7 +1,7 @@
 use iced::{
+    Element, Size, Task,
     widget::image::Handle,
     window::{icon, settings::PlatformSpecific},
-    Element, Size, Task,
 };
 use tracing::{error, info};
 
@@ -9,17 +9,17 @@ use crate::{
     assets::GRUNT_ICON,
     core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
-        account::{load_session, AccountsError},
-        config::LoadConfigError,
-        image::{load_image, DecodedImage, ImagesError},
+        account::{AccountsError, load_session},
+        config::ConfigError,
+        image::{DecodedImage, ImagesError, load_image},
         instance::InstancesError,
-        update::{check_for_update, download_and_apply, UpdatesError},
+        update::{UpdatesError, check_for_update, download_and_apply},
     },
     ui::{
-        theme::grunt_theme,
-        views::{add_instance, home, settings, Screen},
-        widget::overlay::overlay_container,
         GruntState,
+        theme::grunt_theme,
+        views::{Screen, add_instance, home, settings},
+        widget::overlay::overlay_container,
     },
 };
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
@@ -31,7 +31,7 @@ pub enum GruntMessage {
     CloseScreen,
 
     InstancesLoaded(Result<Vec<GruntInstance>, InstancesError>),
-    ConfigLoaded(Result<Config, LoadConfigError>),
+    ConfigLoaded(Result<Config, ConfigError>),
     ImageLoaded(Result<DecodedImage, ImagesError>, i64),
     SessionLoaded(Result<AccountStore, AccountsError>),
     UpdateChecked(Result<Option<Box<velopack::UpdateInfo>>, UpdatesError>),
@@ -44,6 +44,8 @@ pub enum GruntAction {
     OpenSettings,
     CloseScreen,
     CreateInstance(GruntInstance),
+
+    ReloadInstances,
 
     GetImage { id: i64, url: String },
     ApplyUpdate,
@@ -104,7 +106,7 @@ impl GruntLauncher {
             InstancesLoaded(load_result) => {
                 info!("Instances loaded.");
                 if let Ok(instances) = load_result {
-                    self.state.instances.extend(instances);
+                    self.state.instances = instances;
                 }
                 Task::none()
             }
@@ -197,6 +199,14 @@ impl GruntLauncher {
             }
             CreateInstance(instance) => {
                 self.state.instances.push(instance);
+            }
+            ReloadInstances => {
+                return Task::perform(
+                    crate::services::instance::load_instances(
+                        self.state.config.instances_folder.clone(),
+                    ),
+                    GruntMessage::InstancesLoaded,
+                );
             }
             GetImage { id, url } => {
                 return Task::perform(load_image(url), move |bytes| {
