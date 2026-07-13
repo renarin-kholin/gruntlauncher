@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9](https://github.com/renarin-kholin/gruntlauncher/compare/v0.1.8...v0.1.9) (2026-07-13)
+
+
+### Features
+
+* verify downloads ([#27](https://github.com/renarin-kholin/gruntlauncher/issues/27)) ([e247744](https://github.com/renarin-kholin/gruntlauncher/commit/e2477443c403a27e2318884459e87d568c89300f))
+
 ## [0.1.8](https://github.com/renarin-kholin/gruntlauncher/compare/v0.1.7...v0.1.8) (2026-07-13)
 
 
