@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{io::AsyncWriteExt, process::Command};
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     assets::VSAPI_VERSIONS,
@@ -88,6 +88,12 @@ pub enum VersionsError {
 
     #[error("Version installer failed: {0}")]
     InstallerError(String),
+
+    #[error("Failed to verify checksum")]
+    VerificationError,
+
+    #[error("Error while creating blocking task: {0}")]
+    TokioJoinError(Arc<tokio::task::JoinError>),
 }
 impl From<std::io::Error> for VersionsError {
     fn from(value: std::io::Error) -> Self {
@@ -97,6 +103,12 @@ impl From<std::io::Error> for VersionsError {
 impl From<reqwest::Error> for VersionsError {
     fn from(value: reqwest::Error) -> Self {
         VersionsError::Reqwest(Arc::new(value))
+    }
+}
+
+impl From<tokio::task::JoinError> for VersionsError {
+    fn from(value: tokio::task::JoinError) -> Self {
+        VersionsError::TokioJoinError(Arc::new(value))
     }
 }
 pub type Result<T> = std::result::Result<T, VersionsError>;
@@ -143,6 +155,7 @@ async fn get_versions_from_api(
                     version,
                     file_object.filename,
                     file_object.urls.cdn,
+                    file_object.md5,
                 ))
             }
             Err(e) => {
@@ -202,6 +215,7 @@ pub enum InstallStatus {
     Done,
     Failed(VersionsError),
 }
+
 pub async fn download_version(
     gameversion: GameVersion,
     progress: &mut sipper::Sender<InstallStatus>,
@@ -212,7 +226,18 @@ pub async fn download_version(
         tokio::fs::create_dir_all(&temp_download_path).await?;
 
         let temp_file_path = temp_download_path.join(&remote_game.filename);
-        if let Ok(mut temp_file) = tokio::fs::File::create_new(&temp_file_path).await {
+        let verified = if temp_file_path.exists() {
+            //verify the package is not corrupted
+            info!("Existing download found verifying.");
+            progress.send(InstallStatus::Verifying).await;
+            verify_download(remote_game.checksum.clone(), temp_file_path.clone()).await
+        } else {
+            false
+        };
+        debug!("Verification result: {verified}");
+        if let Ok(mut temp_file) = tokio::fs::File::create(&temp_file_path).await
+            && !verified
+        {
             //The file already exsits otherwise
             let response = HTTP.get(&remote_game.url).send().await?;
             let total = response
@@ -237,10 +262,32 @@ pub async fn download_version(
                     })
                     .await;
             }
+            progress.send(InstallStatus::Verifying).await;
+            if verify_download(remote_game.checksum.clone(), temp_file_path.clone()).await {
+                info!("Verified download");
+            } else {
+                return Err(VersionsError::VerificationError);
+            }
         }
         return Ok(Some(temp_file_path));
     }
     Ok(None)
+}
+pub async fn verify_download(checksum: String, download_file: PathBuf) -> bool {
+    let computed_hash = tokio::task::spawn_blocking(move || {
+        let bytes = std::fs::read(&download_file)?;
+        Ok::<String, VersionsError>(format!("{:x}", md5::compute(bytes)))
+    })
+    .await;
+    match computed_hash {
+        Ok(Ok(hash)) => hash == checksum,
+
+        Err(e) => {
+            error!("{e}");
+            false
+        }
+        _ => false,
+    }
 }
 
 pub async fn install_game(
@@ -384,5 +431,22 @@ async fn windows_install(
             .send(InstallStatus::Failed(install_error.clone()))
             .await;
         Err(install_error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn checksums_match() {
+        let result = verify_download(
+            "2370eb6cac1b10c7990e4678b4d3c87e".to_string(),
+            PathBuf::from(
+                "/home/renarin/.cache/gruntlauncher/1.22.2/vs_client_linux-x64_1.22.2.tar.gz",
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(result)
     }
 }
