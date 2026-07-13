@@ -1,4 +1,10 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
+use std::{
+    collections::HashMap,
+    io::{BufReader, Read},
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
+};
 #[cfg(target_os = "windows")]
 use std::{ffi::OsString, path::Path};
 
@@ -30,7 +36,6 @@ struct VSAPIVersionFileObject {
     filename: String,
     #[expect(dead_code)]
     filesize: String,
-    #[expect(dead_code)]
     md5: String,
     urls: VSAPIVersionURLsObject,
 }
@@ -235,9 +240,7 @@ pub async fn download_version(
             false
         };
         debug!("Verification result: {verified}");
-        if let Ok(mut temp_file) = tokio::fs::File::create(&temp_file_path).await
-            && !verified
-        {
+        if !verified && let Ok(mut temp_file) = tokio::fs::File::create(&temp_file_path).await {
             //The file already exsits otherwise
             let response = HTTP.get(&remote_game.url).send().await?;
             let total = response
@@ -275,8 +278,19 @@ pub async fn download_version(
 }
 pub async fn verify_download(checksum: String, download_file: PathBuf) -> bool {
     let computed_hash = tokio::task::spawn_blocking(move || {
-        let bytes = std::fs::read(&download_file)?;
-        Ok::<String, VersionsError>(format!("{:x}", md5::compute(bytes)))
+        let f = std::fs::File::open(&download_file)?;
+        let mut reader = BufReader::new(f);
+        let mut buffer = vec![0u8; 64 * 1024];
+        let mut hash_context = md5::Context::new();
+        loop {
+            let n = reader.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            hash_context.consume(&buffer[..n]);
+        }
+        let hash = hash_context.finalize();
+        Ok::<String, VersionsError>(format!("{:x}", hash))
     })
     .await;
     match computed_hash {
@@ -336,9 +350,13 @@ pub async fn extract_archive(
         .arg(install_path.as_os_str())
         .arg("--strip-components=1")
         .status();
-    extract_child.await?;
-
-    Ok(install_path)
+    if extract_child.await?.success() {
+        Ok(install_path)
+    } else {
+        Err(VersionsError::InstallerError(
+            "extract process exited with a non 0 exit code.".to_string(),
+        ))
+    }
 }
 #[cfg(target_os = "windows")]
 enum RegistryStatus {
@@ -431,22 +449,5 @@ async fn windows_install(
             .send(InstallStatus::Failed(install_error.clone()))
             .await;
         Err(install_error)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[tokio::test]
-    async fn checksums_match() {
-        let result = verify_download(
-            "2370eb6cac1b10c7990e4678b4d3c87e".to_string(),
-            PathBuf::from(
-                "/home/renarin/.cache/gruntlauncher/1.22.2/vs_client_linux-x64_1.22.2.tar.gz",
-            ),
-        )
-        .await
-        .unwrap();
-        assert!(result)
     }
 }
