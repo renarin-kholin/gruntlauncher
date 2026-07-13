@@ -3,7 +3,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::task::JoinError;
 use tracing::info;
-use velopack::{Error as VelopackError, UpdateCheck, UpdateInfo, UpdateManager, sources};
+use velopack::{sources, Error as VelopackError, UpdateCheck, UpdateInfo, UpdateManager};
+
+use crate::services::update::UpdateStatus::InProgress;
 
 #[derive(Clone, Debug, Error)]
 pub enum UpdatesError {
@@ -48,13 +50,40 @@ pub async fn check_for_update() -> Result<Option<Box<UpdateInfo>>> {
     })
     .await?
 }
-
-pub async fn download_and_apply(update: Box<UpdateInfo>) -> Result<()> {
-    tokio::task::spawn_blocking(move || {
+#[derive(Clone, Debug)]
+pub enum UpdateStatus {
+    NotStarted,
+    InProgress(i16), //1 to 100
+    Complete,
+}
+pub async fn download_and_apply(
+    update: Box<UpdateInfo>,
+    progress: &mut sipper::Sender<UpdateStatus>,
+) -> Result<()> {
+    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<i16>();
+    let download_handle = tokio::task::spawn_blocking(move || {
         let manager = manager()?;
-        manager.download_updates(&update, None)?;
+        manager.download_updates(&update, Some(sync_tx))?;
         manager.apply_updates_and_restart(&update.TargetFullRelease)?;
+
         Ok(())
-    })
-    .await?
+    });
+
+    let (async_tx, mut async_rx) = tokio::sync::mpsc::unbounded_channel::<i16>();
+    std::thread::spawn(move || {
+        while let Ok(percent) = sync_rx.recv() {
+            if async_tx.send(percent).is_err() {
+                break;
+            }
+        }
+    });
+
+    while let Some(percent) = async_rx.recv().await {
+        if percent == 100 {
+            progress.send(UpdateStatus::Complete).await;
+        } else {
+            progress.send(UpdateStatus::InProgress(percent)).await;
+        }
+    }
+    download_handle.await?
 }

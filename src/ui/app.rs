@@ -1,25 +1,27 @@
 use iced::{
-    Element, Size, Task,
-    widget::image::Handle,
+    widget::{center, column, image::Handle, progress_bar, text},
     window::{icon, settings::PlatformSpecific},
+    Element, Size, Task,
 };
+use sipper::sipper;
 use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
     core::{account::AccountStore, config::Config, instance::GruntInstance},
     services::{
-        account::{AccountsError, load_session},
+        account::{load_session, AccountsError},
         config::ConfigError,
-        image::{DecodedImage, ImagesError, load_image},
+        image::{load_image, DecodedImage, ImagesError},
         instance::InstancesError,
-        update::{UpdatesError, check_for_update, download_and_apply},
+        update::{check_for_update, download_and_apply, UpdateStatus, UpdatesError},
     },
     ui::{
-        GruntState,
+        app::GruntMessage::{UpdateApplied, UpdateProgress},
         theme::grunt_theme,
-        views::{Screen, add_instance, home, settings},
+        views::{add_instance, home, settings, Screen},
         widget::overlay::overlay_container,
+        GruntState,
     },
 };
 const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
@@ -37,6 +39,8 @@ pub enum GruntMessage {
     UpdateChecked(Result<Option<Box<velopack::UpdateInfo>>, UpdatesError>),
     //Only reachable on failure: applying an update successfully exits the process.
     UpdateApplied(Result<(), UpdatesError>),
+
+    UpdateProgress(UpdateStatus),
 }
 
 pub enum GruntAction {
@@ -53,6 +57,7 @@ pub enum GruntAction {
 
 pub struct GruntLauncher {
     overlay: Option<Screen>,
+    update_status: UpdateStatus,
     home: home::Screen,
     state: GruntState,
 }
@@ -64,6 +69,7 @@ impl GruntLauncher {
                 overlay: None,
                 home: home::Screen::new(),
                 state: GruntState::default(),
+                update_status: UpdateStatus::NotStarted,
             },
             Task::batch([
                 Task::perform(
@@ -75,9 +81,22 @@ impl GruntLauncher {
             ]),
         )
     }
+    pub fn view_update(&self, percent: i16) -> Element<'_, GruntMessage> {
+        let mut update_column = column![text!("Update in progress"),].spacing(10.0);
+        update_column = update_column.push(progress_bar(0.0..=100.0, percent as f32));
+        center(update_column).into()
+    }
     pub fn view(&self) -> Element<'_, GruntMessage> {
         use GruntMessage::*;
         let base = self.home.view(&self.state).map(HomeMessage);
+        if let UpdateStatus::InProgress(percent) = self.update_status {
+            return overlay_container(
+                base,
+                Some(self.view_update(percent)),
+                Some("Update in progress".to_string()),
+                None,
+            );
+        }
         match &self.overlay {
             None => base,
             Some(overlay) => {
@@ -215,7 +234,14 @@ impl GruntLauncher {
             }
             ApplyUpdate => {
                 if let Some(update) = self.state.available_update.clone() {
-                    return Task::perform(download_and_apply(update), GruntMessage::UpdateApplied);
+                    let task = Task::sip(
+                        sipper(|mut progress| async move {
+                            download_and_apply(update, &mut progress).await
+                        }),
+                        UpdateProgress,
+                        UpdateApplied,
+                    );
+                    return task;
                 }
             }
         }
