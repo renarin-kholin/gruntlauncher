@@ -1,11 +1,13 @@
+use crate::assets::GRUNT_ICON;
 use crate::core::game_mod::{GameMod, ModSource};
 use crate::core::instance::GruntInstance;
 use crate::core::version::{GameVersion, VersionCatalog};
 use crate::services::instance::{InstancesError, save_instance};
 use crate::services::version::{VersionsError, load_versions};
-use crate::ui::GruntState;
 use crate::ui::views::ScreenOutput;
+use crate::ui::widget::overlay::overlay_container;
 use crate::ui::widget::table::{self, TableColumn};
+use crate::ui::{GruntAction, GruntState};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::{center, container, right, right_center, space, text_input};
 use iced::{
@@ -13,6 +15,7 @@ use iced::{
     widget::{button, column, image, row, rule, scrollable, text},
 };
 use iced_aw::spinner;
+use std::collections::HashSet;
 use tracing::error;
 
 #[derive(Debug, Clone)]
@@ -41,6 +44,7 @@ pub struct Screen {
     version_columns: Vec<TableColumn>,
     version_rows: Vec<Vec<String>>,
     icon_handle: image::Handle,
+    requested_images: HashSet<i64>,
 }
 impl Screen {
     fn version_rows(versions: &[GameVersion]) -> Vec<Vec<String>> {
@@ -60,6 +64,7 @@ impl Screen {
             ],
             version_rows: vec![],
             icon_handle: image::Handle::from_bytes(GRUNT_ICON),
+            requested_images: HashSet::new(),
         };
         // Reuse an already-loaded catalog; otherwise kick off a load.
         let task = match &state.vs_versions {
@@ -137,62 +142,87 @@ impl Screen {
         .into()
     }
 
-    //pub fn view_mod_item<'a>(
-    //    &'a self,
-    //    game_mod: &GameMod,
-    //    state: &'a GruntState,
-    //) -> Element<'a, Message> {
-    //    use Message::*;
-    //    let mut mod_logo = self.icon_handle.clone();
-    //    if let ModSource::ModDb { mod_id, name, .. } = game_mod.source {
-    //        if let Some(logo) = state.image_cache.peek(&mod_id) {
-    //            mod_logo = logo.clone();
-    //        }
-    //
-    //        column![
-    //            button(
-    //                row![
-    //                    container(image(mod_logo).height(50.0).width(50.0))
-    //                        .style(container::bordered_box),
-    //                    column![text!("{}", name), text!("{}",)].spacing(5.0),
-    //                    right_center(
-    //                        row![button("Remove").on_press(RemoveMod(mod_id))]
-    //                            .spacing(5.0)
-    //                            .align_y(Vertical::Center)
-    //                    )
-    //                ]
-    //                .padding(10.0)
-    //                .spacing(10.0),
-    //            )
-    //            .style(button::subtle)
-    //            .width(Length::Fill),
-    //            rule::horizontal(1.0)
-    //        ]
-    //        .into()
-    //    } else {
-    //        space().into()
-    //    }
-    //}
+    pub fn view_mod_item<'a>(
+        &'a self,
+        game_mod: &GameMod,
+        state: &'a GruntState,
+    ) -> Element<'a, Message> {
+        use Message::*;
+        let mut mod_logo = self.icon_handle.clone();
+        if let ModSource::ModDb {
+            mod_id,
+            name,
+            version,
+            ..
+        } = &game_mod.source
+        {
+            if let Some(logo) = state.image_cache.peek(mod_id) {
+                mod_logo = logo.clone();
+            }
+
+            column![
+                button(
+                    row![
+                        container(image(mod_logo).height(50.0).width(50.0))
+                            .style(container::bordered_box),
+                        column![text!("{}", name), text!("{}", version.to_string())].spacing(5.0),
+                        right_center(
+                            row![
+                                button("Change Version"),
+                                button("Remove").on_press(RemoveMod(*mod_id))
+                            ]
+                            .spacing(5.0)
+                            .align_y(Vertical::Center)
+                        )
+                    ]
+                    .padding(10.0)
+                    .spacing(10.0),
+                )
+                .style(button::subtle)
+                .width(Length::Fill),
+                rule::horizontal(1.0)
+            ]
+            .into()
+        } else {
+            space().into()
+        }
+    }
     pub fn view_mods<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
+        use Message::*;
         column![
-            text!("Mods"),
-            //scrollable(column(
-            //    self.selected_mods
-            //        .iter()
-            //        .map(|(m, r)| self.review_mod_item(m.clone(), r, state))
-            //))
-            //.height(Length::Fill)
-            //.width(Length::Fill),
+            column![text!("Mods")].padding(10.0),
+            scrollable(column(
+                self.instance
+                    .mods
+                    .iter()
+                    .map(|m| self.view_mod_item(m, state))
+            ))
+            .height(Length::Fill)
+            .width(Length::Fill),
             space().height(10.0),
+            row![
+                button("Add Mod"),
+                right(
+                    row![
+                        button("Discard Changes")
+                            .on_press_maybe(self.changed_maybe(DiscardChanges)),
+                        button("Save").on_press_maybe(self.changed_maybe(SaveChanges))
+                    ]
+                    .spacing(10.0)
+                    .align_y(Vertical::Center)
+                )
+            ]
+            .align_y(Vertical::Center)
+            .spacing(10.0)
+            .padding(10.0)
         ]
         .spacing(5.0)
-        .padding(10.0)
         .into()
     }
     pub fn view<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         //TODO: Extract this into a reusable widget
-        row![
+        let base = row![
             scrollable(
                 column![
                     button("General")
@@ -225,14 +255,18 @@ impl Screen {
             }
         ]
         .height(Length::Fill)
-        .width(Length::Fill)
-        .into()
+        .width(Length::Fill);
+
+        overlay_container(base.into(), None, None, None)
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use Message::*;
         match message {
             Navigate(tab) => {
-                self.selected_tab = tab;
+                self.selected_tab = tab.clone();
+                if matches!(tab, Tab::Mods) {
+                    return self.fetch_current_page_images(state);
+                }
             }
             NameChanged(name) => {
                 self.instance.name = name;
@@ -255,6 +289,7 @@ impl Screen {
                         true
                     }
                 });
+                self.on_changed(state);
             }
             DiscardChanges => match self.selected_tab {
                 Tab::General => self.reset_general(state),
@@ -302,7 +337,9 @@ impl Screen {
         }
     }
     fn reset_mods(&mut self, state: &GruntState) {
-        todo!()
+        if let Some(original) = state.instances.iter().find(|i| i.id == self.instance.id) {
+            self.instance.mods = original.mods.clone();
+        }
     }
     fn save(&mut self, state: &mut GruntState) {
         if let Some(instance) = state
@@ -317,5 +354,25 @@ impl Screen {
         if let Some(original) = state.instances.iter().find(|i| i.id == self.instance.id) {
             self.changed = self.instance.ne(original);
         }
+    }
+    fn fetch_current_page_images(&mut self, state: &GruntState) -> ScreenOutput<Message> {
+        let mut output = ScreenOutput::none();
+        for m in self.instance.mods.iter() {
+            if let ModSource::ModDb { mod_id, logo, .. } = &m.source {
+                if state.image_cache.peek(mod_id).is_some() {
+                    continue;
+                } else {
+                    if let Some(logo) = &logo
+                        && self.requested_images.insert(*mod_id)
+                    {
+                        output = output.action_add(GruntAction::GetImageLocal {
+                            id: *mod_id,
+                            path: logo.to_path_buf(),
+                        })
+                    }
+                }
+            }
+        }
+        output
     }
 }

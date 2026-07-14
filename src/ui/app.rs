@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use iced::{
     widget::{center, column, image::Handle, progress_bar, text},
     window::{icon, settings::PlatformSpecific},
@@ -12,7 +14,7 @@ use crate::{
     services::{
         account::{load_session, AccountsError},
         config::ConfigError,
-        image::{load_image, DecodedImage, ImagesError},
+        image::{load_image, load_image_local, DecodedImage, ImagesError},
         instance::InstancesError,
         update::{check_for_update, download_and_apply, UpdateStatus, UpdatesError},
     },
@@ -54,6 +56,7 @@ pub enum GruntAction {
     ReloadInstances,
 
     GetImage { id: i64, url: String },
+    GetImageLocal { id: i64, path: PathBuf },
     ApplyUpdate,
 }
 
@@ -244,6 +247,11 @@ impl GruntLauncher {
             }
             GetImage { id, url } => {
                 return Task::perform(load_image(url), move |bytes| {
+                    GruntMessage::ImageLoaded(bytes, id)
+                });
+            }
+            GetImageLocal { id, path } => {
+                return Task::perform(load_image_local(path), move |bytes| {
                     GruntMessage::ImageLoaded(bytes, id)
                 });
             }
