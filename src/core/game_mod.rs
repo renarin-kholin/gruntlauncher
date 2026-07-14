@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum ModSource {
     ModDb {
         mod_id: i64,
@@ -10,11 +10,12 @@ pub enum ModSource {
         logo: Option<PathBuf>,
         name: String,
         description: String,
+        version: semver::Version,
     },
     Local,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct GameMod {
     pub source: ModSource,
     //Mod zip file
@@ -29,6 +30,7 @@ impl GameMod {
         logo: Option<PathBuf>,
         name: String,
         description: String,
+        version: semver::Version,
     ) -> Self {
         Self {
             source: ModSource::ModDb {
@@ -37,6 +39,7 @@ impl GameMod {
                 logo,
                 name,
                 description,
+                version,
             },
             file: install_path,
         }

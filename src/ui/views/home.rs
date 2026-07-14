@@ -511,7 +511,13 @@ impl Screen {
                 return ScreenOutput::action(GruntAction::ApplyUpdate);
             }
             Message::OpenEditInstance => {
-                return ScreenOutput::action(GruntAction::OpenEditInstance);
+                if let Some(id) = self.selected_instance {
+                    if let Some(instance) = state.instances.iter().find(|i| i.id == id) {
+                        return ScreenOutput::action(GruntAction::OpenEditInstance(
+                            instance.clone(),
+                        ));
+                    }
+                }
             }
             Message::OpenSettings => {
                 return ScreenOutput::action(GruntAction::OpenSettings);

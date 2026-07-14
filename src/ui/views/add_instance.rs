@@ -971,6 +971,7 @@ impl Screen {
                     let logo_folder = logo_folder.clone();
                     let progress = progress.clone();
                     async move {
+                        let modversion = release.modversion.clone();
                         let mod_path = sipper(async move |mut mod_progress| {
                             download_mod(mod_folder, release, &mut mod_progress).await
                         })
@@ -992,6 +993,7 @@ impl Screen {
                             logo,
                             mod_detail.name,
                             mod_detail.text,
+                            modversion,
                         ))
                     }
                 })

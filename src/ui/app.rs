@@ -47,7 +47,7 @@ pub enum GruntMessage {
 pub enum GruntAction {
     OpenAddInstance,
     OpenSettings,
-    OpenEditInstance,
+    OpenEditInstance(GruntInstance),
     CloseScreen,
     CreateInstance(GruntInstance),
 
@@ -218,8 +218,8 @@ impl GruntLauncher {
                 self.overlay = Some(Screen::AddInstance(Box::new(screen)));
                 return task.map(GruntMessage::AddInstanceMessage);
             }
-            OpenEditInstance => {
-                let (screen, task) = edit_instance::Screen::new(&mut self.state);
+            OpenEditInstance(instance) => {
+                let (screen, task) = edit_instance::Screen::new(&mut self.state, instance);
                 self.overlay = Some(Screen::EditInstance(Box::new(screen)));
                 return task.map(GruntMessage::EditInstanceMessage);
             }

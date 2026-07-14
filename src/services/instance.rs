@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sipper::StreamExt;
 use thiserror::Error;
 use tokio::{io::AsyncWriteExt, process::Command};
@@ -9,7 +9,7 @@ use tracing::{debug, error, info};
 
 use crate::{
     core::{account::Account, instance::GruntInstance, version::GameVersionSource},
-    services::instance::InstancesError::ClientSettingsError,
+    services::instance::InstancesError::{ClientSettingsError, EditError},
 };
 
 #[derive(Error, Debug, Clone)]
@@ -28,6 +28,9 @@ pub enum InstancesError {
 
     #[error(transparent)]
     SerdeJson(Arc<serde_json::Error>),
+
+    #[error("Error while editing instance")]
+    EditError,
 }
 
 pub type Result<T> = std::result::Result<T, InstancesError>;
@@ -70,7 +73,6 @@ pub async fn add_instance(
     instance: GruntInstance,
     instances_path: PathBuf,
 ) -> Result<GruntInstance> {
-    tokio::fs::create_dir_all(&instances_path).await?;
     let instance_path = instances_path.join(instance.id.to_string());
     tokio::fs::create_dir_all(&instance_path).await?;
     let mut instance_config =
@@ -80,6 +82,21 @@ pub async fn add_instance(
         .await?;
 
     Ok(instance)
+}
+pub async fn save_instance(instance: GruntInstance, instances_path: PathBuf) -> Result<()> {
+    let instance_path = instances_path.join(instance.id.to_string());
+    tokio::fs::create_dir_all(&instance_path).await?;
+    if let Ok(mut instance_config) =
+        tokio::fs::File::create(instance_path.join("instance.toml")).await
+    {
+        instance_config
+            .write_all((toml::to_string(&instance)?).as_bytes())
+            .await?;
+    } else {
+        error!("Trying to edit an instance but its config doesn't exist.");
+        return Err(EditError);
+    }
+    Ok(())
 }
 
 pub async fn patch_client_settings(instance_path: PathBuf, account: Account) -> Result<()> {
