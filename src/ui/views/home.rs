@@ -23,7 +23,8 @@ use crate::{
         instance::{self, InstancesError},
     },
     ui::{
-        GruntAction, GruntState,
+        GruntAction::{self},
+        GruntState,
         views::{ScreenOutput, home::Message::LoginResult},
         widget::{
             account::{self, LoginRequest},
@@ -65,6 +66,7 @@ pub enum Message {
     AddInstance,
 
     OpenSettings,
+    OpenEditInstance,
 
     //Login Related
     AccountSelected(String),
@@ -226,7 +228,11 @@ impl Screen {
                     .width(Length::Fill)
                     .on_press_maybe(self.selected_instance.map(|_| LaunchInstance)),
             )
-            .push(button(center_x("Edit")).width(Length::Fill))
+            .push(
+                button(center_x("Edit"))
+                    .width(Length::Fill)
+                    .on_press_maybe(self.selected_instance.map(|_| OpenEditInstance)),
+            )
             .push(rule::horizontal(1.0))
             .push(text!("Open Folders"))
             .push(
@@ -503,6 +509,9 @@ impl Screen {
             }
             Message::ApplyUpdate => {
                 return ScreenOutput::action(GruntAction::ApplyUpdate);
+            }
+            Message::OpenEditInstance => {
+                return ScreenOutput::action(GruntAction::OpenEditInstance);
             }
             Message::OpenSettings => {
                 return ScreenOutput::action(GruntAction::OpenSettings);
