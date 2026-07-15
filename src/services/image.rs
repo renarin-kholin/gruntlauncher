@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use image::{EncodableLayout, ImageError};
+use image::ImageError;
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 use thiserror::Error;
 use tokio::{io, task::JoinError};

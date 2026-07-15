@@ -50,4 +50,17 @@ impl<MessageT> ScreenOutput<MessageT> {
             task: t,
         }
     }
+    pub fn map<MessageB>(
+        self,
+        f: impl Fn(MessageT) -> MessageB + Send + 'static,
+    ) -> ScreenOutput<MessageB>
+    where
+        MessageT: 'static + Send,
+        MessageB: Send + 'static,
+    {
+        ScreenOutput {
+            actions: self.actions,
+            task: self.task.map(f),
+        }
+    }
 }
