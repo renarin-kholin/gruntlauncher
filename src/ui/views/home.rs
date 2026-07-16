@@ -64,6 +64,7 @@ pub enum Message {
     LaunchInstance,
     InstanceLaunched(Result<(), InstancesError>),
     AddInstance,
+    DeleteInstance,
 
     OpenSettings,
     OpenEditInstance,
@@ -233,6 +234,10 @@ impl Screen {
                     .width(Length::Fill)
                     .on_press_maybe(self.selected_instance.map(|_| OpenEditInstance)),
             )
+            .push(center_x("Delete"))
+            .style(button::danger)
+            .width(Length::Fill)
+            .on_press_maybe(self.selected_instance.map(|_| DeleteInstance))
             .push(rule::horizontal(1.0))
             .push(text!("Open Folders"))
             .push(
@@ -507,6 +512,7 @@ impl Screen {
                     }
                 }
             }
+            DeleteInstance => if let Some(selected_instance) = self.selected_instance {},
             Message::ApplyUpdate => {
                 return ScreenOutput::action(GruntAction::ApplyUpdate);
             }
