@@ -13,6 +13,7 @@ use iced::{
 use iced_aw::spinner;
 use iced_blitzview::web_view;
 
+use crate::core::game_mod::GameMod;
 use crate::ui::GruntAction;
 use crate::{
     assets::GRUNT_ICON,
@@ -24,6 +25,10 @@ use crate::{
     ui::{GruntState, views::ScreenOutput, widget::release_picker},
 };
 
+pub enum Mode {
+    Browsing,
+    Detail { installed_release_id: i64 },
+}
 #[derive(Debug, Clone)]
 pub enum ModNavigation {
     Next,
@@ -41,6 +46,8 @@ pub struct ModBrowser {
     pub mod_page_index: usize,
     pub mod_total: usize,
     pub requested_images: HashSet<i64>,
+    pub mode: Mode,
+    pub installed_mods: Vec<GameMod>,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +82,8 @@ impl ModBrowser {
             mod_page_size: 50,
             mod_total: 0,
             requested_images: HashSet::new(),
+            mode: Mode::Browsing,
+            installed_mods: vec![],
         }
     }
 
@@ -88,42 +97,136 @@ impl ModBrowser {
         if let Some(logo) = state.image_cache.peek(&moddb_mod.modid) {
             mod_logo = logo.clone();
         }
+        let mut item_row = row![
+            container(image(mod_logo).height(50.0).width(50.0)).style(container::bordered_box),
+            column![
+                text!("{}", moddb_mod.name).font(Font {
+                    weight: font::Weight::Bold,
+                    ..Default::default()
+                }),
+                text!("{}", moddb_mod.author)
+            ]
+            .spacing(5.0)
+        ]
+        .padding(10.0)
+        .spacing(10.0);
+        if self.installed_release(moddb_mod.modid).is_some() {
+            item_row = item_row.push(right_center(text!("Installed")).height(Length::Shrink));
+        }
         column![
-            button(
-                row![
-                    container(image(mod_logo).height(50.0).width(50.0))
-                        .style(container::bordered_box),
-                    column![
-                        text!("{}", moddb_mod.name).font(Font {
-                            weight: font::Weight::Bold,
-                            ..Default::default()
-                        }),
-                        text!("{}", moddb_mod.author)
-                    ]
-                    .spacing(5.0)
-                ]
-                .padding(10.0)
-                .spacing(10.0),
-            )
-            .on_press(SelectMod(moddb_mod.modid))
-            .style(move |theme, mut status| {
-                if let Some(s) = self.selected_mod
-                    && s == moddb_mod.modid
-                {
-                    status = button::Status::Pressed
-                };
-                button::Style {
-                    ..button::subtle(theme, status)
-                }
-            })
-            .width(Length::Fill),
+            button(item_row)
+                .on_press(SelectMod(moddb_mod.modid))
+                .style(move |theme, mut status| {
+                    if let Some(s) = self.selected_mod
+                        && s == moddb_mod.modid
+                    {
+                        status = button::Status::Pressed
+                    };
+                    button::Style {
+                        ..button::subtle(theme, status)
+                    }
+                })
+                .width(Length::Fill),
             rule::horizontal(1.0)
         ]
         .into()
     }
+    pub fn view_mod_detail<'a>(
+        &'a self,
+        selected_version: Option<GameVersion>,
+        state: &'a GruntState,
+    ) -> Element<'a, Message> {
+        use Message::*;
+        let mut mod_preview = column![].width(Length::FillPortion(3));
+
+        {
+            use ModDetailState::*;
+            mod_preview = match &self.mod_detail {
+                NotStarted => mod_preview.push(center(text!("Select a mod to show its preview."))),
+                Loading => mod_preview.push(center(
+                    column![
+                        text!("Loading mod details"),
+                        spinner::Spinner::default().width(30.0).height(30.0)
+                    ]
+                    .spacing(10.0)
+                    .align_x(Horizontal::Center),
+                )),
+                Loaded(details) => {
+                    let page_url = format!(
+                        "https://mods.vintagestory.at/{}",
+                        if let Some(urlalias) = &details.urlalias {
+                            urlalias.clone()
+                        } else {
+                            format!("show/{}", details.modid).to_string()
+                        }
+                    );
+                    let mut mod_release_picker: Row<'_, Message> = row![]
+                        .spacing(10.0)
+                        .padding(padding::all(10.0))
+                        .align_y(Vertical::Center);
+                    let selected = &self.selected_mod_release;
+                    if let Some(version) = selected_version {
+                        mod_release_picker = mod_release_picker.push(
+                            release_picker::ReleasePicker::new(
+                                &details.releases,
+                                version.version,
+                                selected.as_ref(),
+                            )
+                            .on_select(SelectModRelease),
+                        )
+                    }
+                    if matches!(self.mode, Mode::Browsing) {
+                        let in_basket = self
+                            .selected_mods
+                            .iter()
+                            .any(|p| p.0.modid == details.modid);
+                        let installed = self.installed_release(details.modid);
+                        let selected_release_id =
+                            self.selected_mod_release.as_ref().map(|r| r.releaseid);
+                        let (label, pressable) = if in_basket {
+                            ("Added", true)
+                        } else if let Some(release_id) = installed {
+                            if selected_release_id == Some(release_id) {
+                                ("Installed", false)
+                            } else {
+                                ("Change Version", true)
+                            }
+                        } else {
+                            ("Add", true)
+                        };
+                        mod_release_picker = mod_release_picker.push(button(label).on_press_maybe(
+                            (pressable && self.selected_mod.is_some()).then_some(AddMod),
+                        ));
+                    }
+                    mod_preview.push(column![
+                        column!(text!("{}", details.name))
+                            .spacing(5.0)
+                            .padding(padding::all(10.0)),
+                        rule::horizontal(1.0),
+                        //Mod info
+                        scrollable(web_view(&state.webview_content)).height(Length::Fill),
+                        rule::horizontal(1.0),
+                        row![
+                            row![
+                                button("Open in default browser")
+                                    .style(button::subtle)
+                                    .on_press(OpenInBrowser(page_url))
+                            ]
+                            .align_y(Vertical::Center)
+                            .padding(10.0),
+                            right_center(mod_release_picker).height(Length::Shrink)
+                        ]
+                        .height(Length::Shrink),
+                    ])
+                }
+                Failed(e) => mod_preview.push(text!("Failed trying to load mod details: {}", e)),
+            };
+        }
+        mod_preview.into()
+    }
     pub fn view<'a>(
         &'a self,
-        selected_version: &'a Option<GameVersion>,
+        selected_version: Option<GameVersion>,
         state: &'a GruntState,
     ) -> Element<'a, Message> {
         use Message::*;
@@ -192,118 +295,44 @@ impl ModBrowser {
             };
         }
 
-        let mut mod_preview = column![].width(Length::FillPortion(3));
-
-        {
-            use ModDetailState::*;
-            mod_preview = match &self.mod_detail {
-                NotStarted => mod_preview.push(center(text!("Select a mod to show its preview."))),
-                Loading => mod_preview.push(center(
+        let mut mod_view = row![];
+        if let Mode::Browsing = self.mode {
+            mod_view = mod_view
+                .push(
                     column![
-                        text!("Loading mod details"),
-                        spinner::Spinner::default().width(30.0).height(30.0)
-                    ]
-                    .spacing(10.0)
-                    .align_x(Horizontal::Center),
-                )),
-                Loaded(details) => {
-                    let page_url = format!(
-                        "https://mods.vintagestory.at/{}",
-                        if let Some(urlalias) = &details.urlalias {
-                            urlalias.clone()
-                        } else {
-                            format!("show/{}", details.modid).to_string()
-                        }
-                    );
-                    let mut mod_release_picker: Row<'_, Message> = row![]
-                        .spacing(10.0)
-                        .padding(padding::all(10.0))
-                        .align_y(Vertical::Center);
-                    let selected = &self.selected_mod_release;
-                    if let Some(version) = selected_version {
-                        mod_release_picker = mod_release_picker.push(
-                            release_picker::ReleasePicker::new(
-                                &details.releases,
-                                &version.version,
-                                selected.as_ref(),
-                            )
-                            .on_select(SelectModRelease),
-                        )
-                    }
-                    mod_release_picker = mod_release_picker.push(
-                        button(
-                            if self
-                                .selected_mods
-                                .iter()
-                                .find(|p| p.0.modid == details.modid)
-                                .is_some()
-                            {
-                                "Added"
-                            } else {
-                                "Add"
-                            },
-                        )
-                        .on_press_maybe(if self.selected_mod.is_some() {
-                            Some(AddMod)
-                        } else {
-                            None
-                        }),
-                    );
-                    mod_preview.push(column![
-                        column!(text!("{}", details.name))
-                            .spacing(5.0)
-                            .padding(padding::all(10.0)),
-                        rule::horizontal(1.0),
-                        //Mod info
-                        scrollable(web_view(&state.webview_content)).height(Length::Fill),
-                        rule::horizontal(1.0),
-                        row![
+                        column![
+                            text!("Search"),
                             row![
-                                button("Open in default browser")
-                                    .style(button::subtle)
-                                    .on_press(OpenInBrowser(page_url))
+                                text_input("Search for mods", &self.mod_search_query)
+                                    .on_input(SearchChanged),
+                                button("Search").on_press(Search).style(
+                                    move |theme, mut status| {
+                                        if self.mod_search_query.len() < 4 {
+                                            status = button::Status::Disabled;
+                                        }
+                                        button::primary(theme, status)
+                                    }
+                                )
                             ]
-                            .align_y(Vertical::Center)
-                            .padding(10.0),
-                            right_center(mod_release_picker).height(Length::Shrink)
+                            .spacing(10.0)
                         ]
-                        .height(Length::Shrink),
-                    ])
-                }
-                Failed(e) => mod_preview.push(text!("Failed trying to load mod details: {}", e)),
-            };
-        }
-        //Main container
-        row![
-            //Search mods
-            column![
-                column![
-                    text!("Search"),
-                    row![
-                        text_input("Search for mods", &self.mod_search_query)
-                            .on_input(SearchChanged),
-                        button("Search")
-                            .on_press(Search)
-                            .style(move |theme, mut status| {
-                                if self.mod_search_query.len() < 4 {
-                                    status = button::Status::Disabled;
-                                }
-                                button::primary(theme, status)
-                            })
+                        .padding(padding::all(10.0))
+                        .spacing(5.0),
+                        rule::horizontal(1.0),
+                        mods_list
                     ]
-                    .spacing(10.0)
-                ]
-                .padding(padding::all(10.0))
-                .spacing(5.0),
-                rule::horizontal(1.0),
-                mods_list
-            ]
-            .width(Length::FillPortion(2)),
-            rule::vertical(1.0),
-            mod_preview
-        ]
-        .into()
+                    .width(Length::FillPortion(2)),
+                )
+                .push(rule::vertical(1.0))
+        };
+        mod_view
+            .push(
+                //Search mods
+                self.view_mod_detail(selected_version, state),
+            )
+            .into()
     }
+
     pub fn update(
         &mut self,
         message: Message,
@@ -380,9 +409,24 @@ impl ModBrowser {
                 Ok(mod_details) => {
                     state.webview_content.load_html(&mod_details.text);
 
-                    let compatible_release = selected_version.as_ref().map(|gameversion| {
-                        get_compatible_release(&mod_details.releases, gameversion)
-                    });
+                    let compatible_release = match &self.mode {
+                        Mode::Browsing => selected_version.as_ref().map(|gameversion| {
+                            get_compatible_release(&mod_details.releases, gameversion)
+                        }),
+                        Mode::Detail {
+                            installed_release_id,
+                        } => mod_details
+                            .releases
+                            .iter()
+                            .find(|r| r.releaseid == *installed_release_id)
+                            .cloned()
+                            .or_else(|| {
+                                // Installed release no longer listed on ModDB.
+                                selected_version.as_ref().map(|gameversion| {
+                                    get_compatible_release(&mod_details.releases, gameversion)
+                                })
+                            }),
+                    };
                     self.selected_mod_release = compatible_release;
                     self.mod_detail = ModDetailState::Loaded(mod_details);
                 }
@@ -392,6 +436,50 @@ impl ModBrowser {
             },
         }
         ScreenOutput::none()
+    }
+    pub fn mod_version_changed(&self, original_release_id: i64) -> bool {
+        if let Some(mod_release) = &self.selected_mod_release {
+            mod_release.releaseid != original_release_id
+        } else {
+            false
+        }
+    }
+    pub fn mod_list_changed(&self, original: &[GameMod]) -> bool {
+        self.selected_mods
+            .iter()
+            .any(|(detail, release)| !Self::is_installed(original, detail.modid, release.releaseid))
+    }
+    fn is_installed(mods: &[GameMod], modid: i64, releaseid: i64) -> bool {
+        mods.iter().any(|m| {
+            matches!(
+                m.source,
+                crate::core::game_mod::ModSource::ModDb { mod_id, release_id, .. }
+                    if mod_id == modid && release_id == releaseid
+            )
+        })
+    }
+    pub fn picks(&self) -> Vec<(Box<ModDetail>, Release)> {
+        match self.mode {
+            Mode::Browsing => self.selected_mods.clone(),
+            Mode::Detail {
+                installed_release_id,
+            } => match (&self.mod_detail, &self.selected_mod_release) {
+                (ModDetailState::Loaded(detail), Some(release))
+                    if release.releaseid != installed_release_id =>
+                {
+                    vec![(detail.clone(), release.clone())]
+                }
+                _ => vec![],
+            },
+        }
+    }
+    fn installed_release(&self, modid: i64) -> Option<i64> {
+        self.installed_mods.iter().find_map(|m| match m.source {
+            crate::core::game_mod::ModSource::ModDb {
+                mod_id, release_id, ..
+            } if mod_id == modid => Some(release_id),
+            _ => None,
+        })
     }
     fn remove_mod(&mut self, modid: i64) -> bool {
         if let Some(index) = self.selected_mods.iter().position(|m| m.0.modid == modid) {

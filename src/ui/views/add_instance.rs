@@ -2,15 +2,15 @@ use futures::stream::{self, StreamExt, TryStreamExt};
 use std::{collections::HashMap, path::PathBuf};
 
 use iced::{
-    Element,
-    Length::{self, Fill, Shrink},
-    Task,
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
         button, center, column, container, image, progress_bar, right, right_center, row, rule,
         scrollable, text, text_input,
     },
+    Element,
+    Length::{self, Fill, Shrink},
+    Task,
 };
 use iced_aw::spinner;
 use thiserror::Error;
@@ -24,26 +24,26 @@ use crate::{
         version::{GameVersion, GameVersionSource, VersionCatalog},
     },
     services::{
-        game_mod::{ModDetail, ModDownloadProgress, ModsError, Release, download_mod},
-        image::{ImagesError, save_image},
+        game_mod::{download_mod, ModDetail, ModDownloadProgress, ModsError, Release},
+        image::{save_image, ImagesError},
         instance::{self, InstancesError},
         version::{
-            InstallStatus, VersionsError, download_version, install_game, load_versions,
-            refresh_versions,
+            download_version, install_game, load_versions, refresh_versions, InstallStatus,
+            VersionsError,
         },
     },
     ui::{
-        GruntAction, GruntState,
         component::mod_browser::{self, ModBrowser},
         views::ScreenOutput,
         widget::{
             overlay::overlay_container,
             table::{self, TableColumn},
         },
+        GruntAction, GruntState,
     },
 };
 use sipper::Sipper;
-use sipper::{Straw, sipper};
+use sipper::{sipper, Straw};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
@@ -398,7 +398,7 @@ impl Screen {
         //Main container
         column![
             self.mod_browser
-                .view(&self.selected_version, state)
+                .view(self.selected_version.clone(), state)
                 .map(ModBrowserMessage),
             rule::horizontal(1.0),
             right_center(
@@ -521,11 +521,8 @@ impl Screen {
             },
             Message::CreateInstance => {
                 let Some(version) = self.selected_version.clone() else {
-                    // No version selected yet — form validation will surface this later.
                     return ScreenOutput::none();
                 };
-                // TODO(#1): persist the instance (GruntAction::CreateInstance) once the
-                // download/extract flow is wired up.
                 let (task, _handle) = Task::sip(
                     Self::install_instance(
                         version,

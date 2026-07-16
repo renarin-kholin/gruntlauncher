@@ -78,7 +78,7 @@ struct PickerState {
 
 pub struct ReleasePicker<'a, Message> {
     releases: &'a [Release],
-    game_version: &'a semver::Version,
+    game_version: semver::Version,
     selected: Option<&'a Release>,
     on_select: Option<Box<dyn Fn(Release) -> Message + 'a>>,
     text_size: f32,
@@ -87,7 +87,7 @@ pub struct ReleasePicker<'a, Message> {
 impl<'a, Message> ReleasePicker<'a, Message> {
     pub fn new(
         releases: &'a [Release],
-        game_version: &'a semver::Version,
+        game_version: semver::Version,
         selected: Option<&'a Release>,
     ) -> Self {
         Self {
@@ -117,7 +117,7 @@ impl<'a, Message> ReleasePicker<'a, Message> {
         }
         self.releases
             .iter()
-            .find(|r| status(r, self.game_version) == Status::Ok)
+            .find(|r| status(r, &self.game_version) == Status::Ok)
             .or_else(|| self.releases.first())
     }
 }
@@ -198,7 +198,7 @@ where
         let bounds = layout.bounds();
 
         let (label, st) = match self.effective_selected() {
-            Some(r) => (r.modversion.to_string(), status(r, self.game_version)),
+            Some(r) => (r.modversion.to_string(), status(r, &self.game_version)),
             None => ("-".to_string(), Status::Old),
         };
 
@@ -281,7 +281,7 @@ where
 
         Some(overlay::Element::new(Box::new(Popover {
             releases: self.releases,
-            game_version: self.game_version,
+            game_version: &self.game_version,
             selected: self.selected,
             on_select: self.on_select.as_deref(),
             state,
