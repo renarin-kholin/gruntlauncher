@@ -2,11 +2,13 @@ use iced::Task;
 
 use crate::ui::GruntAction;
 pub mod add_instance;
+pub mod edit_instance;
 pub mod home;
 pub mod settings;
 //The current actively shown Screen
 pub enum Screen {
     AddInstance(Box<add_instance::Screen>),
+    EditInstance(Box<edit_instance::Screen>),
     Settings(Box<settings::Screen>),
 }
 
@@ -14,6 +16,7 @@ impl Screen {
     pub fn title(&self) -> String {
         match self {
             Screen::AddInstance(_) => "Add a new Instance".to_string(),
+            Screen::EditInstance(_) => "Edit an instance".to_string(),
             Screen::Settings(_) => "Settings".to_string(),
         }
     }
@@ -45,6 +48,19 @@ impl<MessageT> ScreenOutput<MessageT> {
         Self {
             actions: vec![],
             task: t,
+        }
+    }
+    pub fn map<MessageB>(
+        self,
+        f: impl Fn(MessageT) -> MessageB + Send + 'static,
+    ) -> ScreenOutput<MessageB>
+    where
+        MessageT: 'static + Send,
+        MessageB: Send + 'static,
+    {
+        ScreenOutput {
+            actions: self.actions,
+            task: self.task.map(f),
         }
     }
 }

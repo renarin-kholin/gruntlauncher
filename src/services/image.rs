@@ -60,12 +60,9 @@ impl Debug for DecodedImage {
 pub async fn get_image_bytes(url: String) -> Result<Bytes> {
     Ok(HTTP.get(url).send().await?.bytes().await?)
 }
-pub async fn load_image(url: String) -> Result<DecodedImage> {
-    let bytes = get_image_bytes(url).await?;
+async fn image_from_bytes(b: bytes::Bytes) -> Result<DecodedImage> {
     let decoded_image = tokio::task::spawn_blocking(move || -> Result<DecodedImage> {
-        let rgba = image::load_from_memory(&bytes)?
-            .thumbnail(28, 28)
-            .into_rgba8();
+        let rgba = image::load_from_memory(&b)?.thumbnail(28, 28).into_rgba8();
         let (width, height) = rgba.dimensions();
         Ok(DecodedImage {
             width,
@@ -76,7 +73,15 @@ pub async fn load_image(url: String) -> Result<DecodedImage> {
     .await??;
     Ok(decoded_image)
 }
+pub async fn load_image(url: String) -> Result<DecodedImage> {
+    let bytes = get_image_bytes(url).await?;
+    image_from_bytes(bytes).await
+}
 
+pub async fn load_image_local(path: PathBuf) -> Result<DecodedImage> {
+    let bytes = bytes::Bytes::from(tokio::fs::read(&path).await?);
+    image_from_bytes(bytes).await
+}
 pub async fn save_image(path: PathBuf, url: String) -> Result<PathBuf> {
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;

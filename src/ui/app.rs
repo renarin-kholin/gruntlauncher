@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use iced::{
     Element, Size, Task,
     widget::{center, column, image::Handle, progress_bar, text},
@@ -12,7 +14,7 @@ use crate::{
     services::{
         account::{AccountsError, load_session},
         config::ConfigError,
-        image::{DecodedImage, ImagesError, load_image},
+        image::{DecodedImage, ImagesError, load_image, load_image_local},
         instance::InstancesError,
         update::{UpdateStatus, UpdatesError, check_for_update, download_and_apply},
     },
@@ -20,7 +22,7 @@ use crate::{
         GruntState,
         app::GruntMessage::{UpdateApplied, UpdateProgress},
         theme::grunt_theme,
-        views::{Screen, add_instance, home, settings},
+        views::{Screen, add_instance, edit_instance, home, settings},
         widget::overlay::overlay_container,
     },
 };
@@ -29,6 +31,7 @@ const GRUNT_LAUNCHER_ID: &str = "com.renarin.gruntlauncher";
 pub enum GruntMessage {
     HomeMessage(home::Message),
     AddInstanceMessage(add_instance::Message),
+    EditInstanceMessage(edit_instance::Message),
     SettingsMessage(settings::Message),
     CloseScreen,
 
@@ -46,12 +49,14 @@ pub enum GruntMessage {
 pub enum GruntAction {
     OpenAddInstance,
     OpenSettings,
+    OpenEditInstance(GruntInstance),
     CloseScreen,
     CreateInstance(GruntInstance),
 
     ReloadInstances,
 
     GetImage { id: i64, url: String },
+    GetImageLocal { id: i64, path: PathBuf },
     ApplyUpdate,
 }
 
@@ -102,6 +107,7 @@ impl GruntLauncher {
             Some(overlay) => {
                 let panel = match overlay {
                     Screen::AddInstance(s) => s.view(&self.state).map(AddInstanceMessage),
+                    Screen::EditInstance(s) => s.view(&self.state).map(EditInstanceMessage),
                     Screen::Settings(s) => s.view(&self.state).map(SettingsMessage),
                 };
                 overlay_container(base, Some(panel), Some(overlay.title()), Some(CloseScreen))
@@ -186,6 +192,13 @@ impl GruntLauncher {
                     out.task.map(AddInstanceMessage),
                 ])
             }
+            EditInstanceMessage(m) if let Some(EditInstance(s)) = &mut self.overlay => {
+                let out = s.update(m, &mut self.state);
+                Task::batch([
+                    self.handle_actions(out.actions),
+                    out.task.map(EditInstanceMessage),
+                ])
+            }
             SettingsMessage(m) if let Some(Settings(s)) = &mut self.overlay => {
                 let out = s.update(m, &mut self.state);
                 Task::batch([
@@ -208,6 +221,11 @@ impl GruntLauncher {
                 self.overlay = Some(Screen::AddInstance(Box::new(screen)));
                 return task.map(GruntMessage::AddInstanceMessage);
             }
+            OpenEditInstance(instance) => {
+                let (screen, task) = edit_instance::Screen::new(&mut self.state, instance);
+                self.overlay = Some(Screen::EditInstance(Box::new(screen)));
+                return task.map(GruntMessage::EditInstanceMessage);
+            }
             OpenSettings => {
                 let (screen, task) = settings::Screen::new(&mut self.state);
                 self.overlay = Some(Screen::Settings(Box::new(screen)));
@@ -229,6 +247,11 @@ impl GruntLauncher {
             }
             GetImage { id, url } => {
                 return Task::perform(load_image(url), move |bytes| {
+                    GruntMessage::ImageLoaded(bytes, id)
+                });
+            }
+            GetImageLocal { id, path } => {
+                return Task::perform(load_image_local(path), move |bytes| {
                     GruntMessage::ImageLoaded(bytes, id)
                 });
             }
