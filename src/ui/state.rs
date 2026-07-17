@@ -1,6 +1,5 @@
 use std::num::NonZeroUsize;
 
-use iced::Task;
 use iced_blitzview::Content;
 use lru::LruCache;
 
