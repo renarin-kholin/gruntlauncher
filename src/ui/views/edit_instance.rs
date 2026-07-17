@@ -463,6 +463,7 @@ impl Screen {
             children,
             title,
             (!self.installing).then_some(CloseModBrowser),
+            false,
         )
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
