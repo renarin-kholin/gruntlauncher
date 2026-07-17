@@ -6,6 +6,7 @@ use thiserror::Error;
 use tokio::{io::AsyncWriteExt, process::Command};
 use tokio_stream::wrappers::ReadDirStream;
 use tracing::{debug, error, info};
+use uuid::Uuid;
 
 use crate::{
     core::{account::Account, instance::GruntInstance, version::GameVersionSource},
@@ -44,6 +45,13 @@ impl From<serde_json::Error> for InstancesError {
     fn from(value: serde_json::Error) -> Self {
         InstancesError::SerdeJson(Arc::new(value))
     }
+}
+
+pub async fn delete_instance(instance: Uuid, instances_path: PathBuf) -> Result<()> {
+    tokio::fs::create_dir_all(&instances_path).await?;
+    let instance_path = instances_path.join(instance.to_string());
+    tokio::fs::remove_dir_all(&instance_path).await?;
+    Ok(())
 }
 pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance>> {
     tokio::fs::create_dir_all(&instances_path).await?;

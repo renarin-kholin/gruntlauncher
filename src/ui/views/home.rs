@@ -20,11 +20,13 @@ use crate::{
         account::{
             AccountsError, LoginStatus, save_account, save_accounts, send_login, validate_session,
         },
-        instance::{self, InstancesError},
+        instance::{self, InstancesError, delete_instance},
     },
     ui::{
         GruntAction::{self},
         GruntState,
+        app::GruntMessage,
+        state::Dialog,
         views::{ScreenOutput, home::Message::LoginResult},
         widget::{
             account::{self, LoginRequest},
@@ -64,6 +66,8 @@ pub enum Message {
     LaunchInstance,
     InstanceLaunched(Result<(), InstancesError>),
     AddInstance,
+    DeleteInstance,
+    ConfirmDeleteInstance,
 
     OpenSettings,
     OpenEditInstance,
@@ -82,6 +86,7 @@ pub enum Message {
     SessionSaved(Result<(), AccountsError>),
     SessionValidated(Result<bool, AccountsError>),
     LoginResult(Result<LoginStatus, AccountsError>),
+    DeleteResult(Result<(), InstancesError>),
 
     //Folders
     OpenInstanceFolder,
@@ -90,6 +95,11 @@ pub enum Message {
     ApplyUpdate,
 }
 
+impl From<Message> for GruntMessage {
+    fn from(value: Message) -> Self {
+        GruntMessage::HomeMessage(value)
+    }
+}
 impl Default for Screen {
     fn default() -> Self {
         Self::new()
@@ -202,6 +212,13 @@ impl Screen {
         ])
         .into()
     }
+    pub fn maybe_selected<T>(&self, message: T) -> Option<T> {
+        if self.selected_instance.is_some() {
+            Some(message)
+        } else {
+            None
+        }
+    }
     pub fn view_sidebar<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
         let mut sidebar: Column<'a, Message> = column![]
@@ -226,24 +243,30 @@ impl Screen {
             .push(
                 button(center_x("Launch"))
                     .width(Length::Fill)
-                    .on_press_maybe(self.selected_instance.map(|_| LaunchInstance)),
+                    .on_press_maybe(self.maybe_selected(LaunchInstance)),
             )
             .push(
                 button(center_x("Edit"))
                     .width(Length::Fill)
-                    .on_press_maybe(self.selected_instance.map(|_| OpenEditInstance)),
+                    .on_press_maybe(self.maybe_selected(OpenEditInstance)),
+            )
+            .push(
+                button(center_x("Delete"))
+                    .style(button::danger)
+                    .width(Length::Fill)
+                    .on_press_maybe(self.maybe_selected(DeleteInstance)),
             )
             .push(rule::horizontal(1.0))
             .push(text!("Open Folders"))
             .push(
                 button(center_x("Mods"))
                     .width(Length::Fill)
-                    .on_press_maybe(self.selected_instance.map(|_| OpenModFolder)),
+                    .on_press_maybe(self.maybe_selected(OpenModFolder)),
             )
             .push(
                 button(center_x("Instance"))
                     .width(Length::Fill)
-                    .on_press_maybe(self.selected_instance.map(|_| OpenInstanceFolder)),
+                    .on_press_maybe(self.maybe_selected(OpenInstanceFolder)),
             )
             .into()
     }
@@ -313,7 +336,7 @@ impl Screen {
         } else {
             (None, None)
         };
-        overlay_container(base.into(), panel_children, panel_title, None)
+        overlay_container(base.into(), panel_children, panel_title, None, false)
     }
     pub fn update(&mut self, message: Message, state: &mut GruntState) -> ScreenOutput<Message> {
         use GruntAction::*;
@@ -507,6 +530,26 @@ impl Screen {
                     }
                 }
             }
+            DeleteInstance => {
+                state.dialog = Some(Dialog {
+                    title: "Delete Instance".to_string(),
+                    message: "Are you sure you want to delete this instance?".to_string(),
+                    confirm: Some(ConfirmDeleteInstance.into()),
+                    cancel: None,
+                });
+                return ScreenOutput::action(GruntAction::OpenDialog);
+            }
+            ConfirmDeleteInstance => {
+                if let Some(selected) = self.selected_instance {
+                    self.selected_instance = None;
+                    state.instances.retain(|i| i.id != selected);
+
+                    return ScreenOutput::task(Task::perform(
+                        delete_instance(selected, state.config.instances_folder.clone()),
+                        DeleteResult,
+                    ));
+                }
+            }
             Message::ApplyUpdate => {
                 return ScreenOutput::action(GruntAction::ApplyUpdate);
             }
@@ -520,6 +563,12 @@ impl Screen {
             Message::OpenSettings => {
                 return ScreenOutput::action(GruntAction::OpenSettings);
             }
+            DeleteResult(result) => match result {
+                Ok(()) => {}
+                Err(e) => {
+                    error!("Error while deleting instance: {e}");
+                }
+            },
         }
         ScreenOutput::none()
     }

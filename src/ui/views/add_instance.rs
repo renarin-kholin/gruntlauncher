@@ -391,7 +391,13 @@ impl Screen {
         } else {
             Some(self.view_progress_overlay())
         };
-        overlay_container(base.into(), child, Some("Adding instance".into()), None)
+        overlay_container(
+            base.into(),
+            child,
+            Some("Adding instance".into()),
+            None,
+            false,
+        )
     }
     fn view_mods<'a>(&'a self, state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;

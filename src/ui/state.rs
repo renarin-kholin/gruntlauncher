@@ -3,9 +3,16 @@ use std::num::NonZeroUsize;
 use iced_blitzview::Content;
 use lru::LruCache;
 
-use crate::core::{
-    account::Account, config::Config, instance::GruntInstance, version::VersionCatalog,
+use crate::{
+    core::{account::Account, config::Config, instance::GruntInstance, version::VersionCatalog},
+    ui::app::GruntMessage,
 };
+pub struct Dialog {
+    pub title: String,
+    pub message: String,
+    pub cancel: Option<GruntMessage>,
+    pub confirm: Option<GruntMessage>,
+}
 
 pub struct GruntState {
     pub instances: Vec<GruntInstance>,
@@ -16,6 +23,7 @@ pub struct GruntState {
     pub accounts: Vec<Account>,
     pub selected_account: Option<String>,
     pub available_update: Option<Box<velopack::UpdateInfo>>,
+    pub dialog: Option<Dialog>,
 }
 impl Default for GruntState {
     fn default() -> Self {
@@ -30,6 +38,7 @@ impl Default for GruntState {
             accounts: vec![],
             selected_account: None,
             available_update: None,
+            dialog: None,
         }
     }
 }

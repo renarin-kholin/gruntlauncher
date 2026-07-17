@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use iced::{
     Element, Size, Task,
-    widget::{center, column, image::Handle, progress_bar, text},
+    alignment::Horizontal,
+    widget::{button, center, column, image::Handle, progress_bar, row, text},
     window::{icon, settings::PlatformSpecific},
 };
 use sipper::sipper;
@@ -34,6 +35,8 @@ pub enum GruntMessage {
     EditInstanceMessage(edit_instance::Message),
     SettingsMessage(settings::Message),
     CloseScreen,
+    CloseDialog,
+    ConfirmDialog,
 
     InstancesLoaded(Result<Vec<GruntInstance>, InstancesError>),
     ConfigLoaded(Result<Config, ConfigError>),
@@ -45,11 +48,11 @@ pub enum GruntMessage {
 
     UpdateProgress(UpdateStatus),
 }
-
 pub enum GruntAction {
     OpenAddInstance,
     OpenSettings,
     OpenEditInstance(GruntInstance),
+    OpenDialog,
     CloseScreen,
     CreateInstance(GruntInstance),
 
@@ -100,6 +103,29 @@ impl GruntLauncher {
                 Some(self.view_update(percent)),
                 Some("Update in progress".to_string()),
                 None,
+                false,
+            );
+        }
+        if let Some(dialog) = &self.state.dialog {
+            return overlay_container(
+                base,
+                Some(
+                    column![
+                        text!("{}", dialog.message).center(),
+                        row![
+                            button("Cancel").on_press(CloseDialog),
+                            button("Confirm").on_press(ConfirmDialog)
+                        ]
+                        .spacing(10.0)
+                    ]
+                    .padding(20.0)
+                    .spacing(10.0)
+                    .align_x(Horizontal::Center)
+                    .into(),
+                ),
+                Some(dialog.title.clone()),
+                Some(CloseDialog),
+                true,
             );
         }
         match &self.overlay {
@@ -110,7 +136,13 @@ impl GruntLauncher {
                     Screen::EditInstance(s) => s.view(&self.state).map(EditInstanceMessage),
                     Screen::Settings(s) => s.view(&self.state).map(SettingsMessage),
                 };
-                overlay_container(base, Some(panel), Some(overlay.title()), Some(CloseScreen))
+                overlay_container(
+                    base,
+                    Some(panel),
+                    Some(overlay.title()),
+                    Some(CloseScreen),
+                    false,
+                )
             }
         }
     }
@@ -210,6 +242,24 @@ impl GruntLauncher {
                 self.overlay = None;
                 Task::none()
             }
+            CloseDialog => {
+                if let Some(dialog) = self.state.dialog.take()
+                    && let Some(cancel) = dialog.cancel
+                {
+                    return Task::done(cancel);
+                }
+                self.state.dialog = None;
+                Task::none()
+            }
+            ConfirmDialog => {
+                if let Some(dialog) = self.state.dialog.take()
+                    && let Some(confirm) = dialog.confirm
+                {
+                    return Task::done(confirm);
+                }
+                self.state.dialog = None;
+                Task::none()
+            }
             _ => Task::none(),
         }
     }
@@ -267,6 +317,7 @@ impl GruntLauncher {
                     return task;
                 }
             }
+            OpenDialog => {}
         }
         Task::none()
     }

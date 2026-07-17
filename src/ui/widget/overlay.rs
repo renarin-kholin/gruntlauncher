@@ -13,11 +13,12 @@ pub fn overlay_container<'a, TMessage: 'a + Clone>(
     panel_children: Option<Element<'a, TMessage>>,
     panel_title: Option<String>,
     on_close_maybe: Option<TMessage>,
+    compact: bool,
 ) -> Element<'a, TMessage> {
     let mut container_stack = stack![base,];
     if let (Some(children), Some(title)) = (panel_children, panel_title) {
         container_stack = container_stack.push(opaque(
-            container(overlay_pane(children, title, on_close_maybe))
+            container(overlay_pane(children, title, on_close_maybe, compact))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .padding(padding::all(40.0))
@@ -39,7 +40,13 @@ fn overlay_pane<'a, TMessage: 'a + Clone>(
     children: Element<'a, TMessage>,
     title: String,
     on_close_maybe: Option<TMessage>,
+    compact: bool,
 ) -> Element<'a, TMessage> {
+    let compact_size = if compact {
+        Length::Shrink
+    } else {
+        Length::Fill
+    };
     let mut top_bar =
         row![text!("{}", title).color(grunt_theme().extended_palette().secondary.strong.color)]
             .align_y(Vertical::Center);
@@ -75,8 +82,8 @@ fn overlay_pane<'a, TMessage: 'a + Clone>(
             .width(Length::Fill),
         children
     ])
-    .width(Length::Fill)
-    .height(Length::Fill)
+    .width(compact_size)
+    .height(compact_size)
     .style(container::bordered_box)
     .into()
 }
