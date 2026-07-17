@@ -18,6 +18,10 @@
 
 GruntLauncher manages multiple Vintage Story game versions and instances side by side, so you can keep separate mod setups for different worlds or versions without them stepping on each other which is similar in spirit to launchers like Prism/MultiMC for Minecraft.
 
+## Preview
+
+<img width="640" height="360" alt="output" src="assets/preview.gif" />
+
 ## Features
 - [x] **Multiple instances**: create and manage several independent Vintage Story setups, each with its own game version and mod list.
 - [x] **Version management**: download and install any released game version; already-downloaded versions are reused instead of re-fetched.
