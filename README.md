@@ -26,8 +26,8 @@ GruntLauncher manages multiple Vintage Story game versions and instances side by
 - [x] **Launch from the launcher**: start an instance directly, with its own data and mods directory.
 - [x] **Accounts**: Login using your vintage story game account and use it with any instance without having to login every time.
 - [x] **Manage Settings**: Edit the global settings.
-- [ ] **Manage Instances**: Edit the details of your instances.
-
+- [x] **Manage Instances**: Edit the details of your instances.
+- [ ] **Modpacks**: Create and share modpacks with ease for singleplayer worlds.
 
 ## Platform support
 
