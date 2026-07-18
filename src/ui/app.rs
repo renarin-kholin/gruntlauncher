@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use iced::{
     Element, Size, Task,
     alignment::Horizontal,
-    widget::{button, center, column, image::Handle, progress_bar, row, text},
+    widget::{button, column, image::Handle, progress_bar, row, text},
     window::{icon, settings::PlatformSpecific},
 };
 use sipper::sipper;
@@ -90,9 +90,12 @@ impl GruntLauncher {
         )
     }
     pub fn view_update(&self, percent: i16) -> Element<'_, GruntMessage> {
-        let mut update_column = column![text!("Update in progress"),].spacing(10.0);
-        update_column = update_column.push(progress_bar(0.0..=100.0, percent as f32));
-        center(update_column).into()
+        let update_column = column![text!("Update in progress: {}%", percent),]
+            .spacing(10.0)
+            .padding(10.0);
+        update_column
+            .push(progress_bar(0.0..=100.0, percent as f32))
+            .into()
     }
     pub fn view(&self) -> Element<'_, GruntMessage> {
         use GruntMessage::*;
@@ -258,6 +261,10 @@ impl GruntLauncher {
                     return Task::done(confirm);
                 }
                 self.state.dialog = None;
+                Task::none()
+            }
+            UpdateProgress(status) => {
+                self.update_status = status;
                 Task::none()
             }
             _ => Task::none(),
