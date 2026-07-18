@@ -161,45 +161,36 @@ impl GruntLauncher {
                         InstancesLoaded,
                     );
                 }
-                Task::none()
             }
             InstancesLoaded(load_result) => {
                 info!("Instances loaded.");
                 if let Ok(instances) = load_result {
                     self.state.instances = instances;
                 }
-                Task::none()
             }
-            ImageLoaded(result, id) => {
-                match result {
-                    Ok(decoded) => {
-                        self.state.image_cache.push(
-                            id,
-                            Handle::from_rgba(decoded.width, decoded.height, decoded.rgba),
-                        );
-                    }
-                    Err(e) => {
-                        error!("Error while loading image: {:?}", e);
-                    }
+            ImageLoaded(result, id) => match result {
+                Ok(decoded) => {
+                    self.state.image_cache.push(
+                        id,
+                        Handle::from_rgba(decoded.width, decoded.height, decoded.rgba),
+                    );
                 }
-                Task::none()
-            }
-            UpdateChecked(result) => {
-                match result {
-                    Ok(Some(update)) => {
-                        info!("Update available: {}", update.TargetFullRelease.Version);
-                        self.state.available_update = Some(update);
-                    }
-                    Ok(None) => info!("No update available."),
-                    Err(e) => error!("Error while checking for updates: {}", e),
+                Err(e) => {
+                    error!("Error while loading image: {:?}", e);
                 }
-                Task::none()
-            }
+            },
+            UpdateChecked(result) => match result {
+                Ok(Some(update)) => {
+                    info!("Update available: {}", update.TargetFullRelease.Version);
+                    self.state.available_update = Some(update);
+                }
+                Ok(None) => info!("No update available."),
+                Err(e) => error!("Error while checking for updates: {}", e),
+            },
             UpdateApplied(result) => {
                 if let Err(e) = result {
                     error!("Error while applying update: {}", e);
                 }
-                Task::none()
             }
             SessionLoaded(load_result) => {
                 info!("Session info loaded.");
@@ -212,38 +203,42 @@ impl GruntLauncher {
                         error!("Error while loading accounts store: {}", e);
                     }
                 }
-                Task::none()
             }
 
             //Screen message wrappers
             HomeMessage(m) => {
                 let out = self.home.update(m, &mut self.state);
-                Task::batch([self.handle_actions(out.actions), out.task.map(HomeMessage)])
+                return Task::batch([self.handle_actions(out.actions), out.task.map(HomeMessage)]);
             }
-            AddInstanceMessage(m) if let Some(AddInstance(s)) = &mut self.overlay => {
-                let out = s.update(m, &mut self.state);
-                Task::batch([
-                    self.handle_actions(out.actions),
-                    out.task.map(AddInstanceMessage),
-                ])
+            AddInstanceMessage(m) => {
+                if let Some(AddInstance(s)) = &mut self.overlay {
+                    let out = s.update(m, &mut self.state);
+                    return Task::batch([
+                        self.handle_actions(out.actions),
+                        out.task.map(AddInstanceMessage),
+                    ]);
+                }
             }
-            EditInstanceMessage(m) if let Some(EditInstance(s)) = &mut self.overlay => {
-                let out = s.update(m, &mut self.state);
-                Task::batch([
-                    self.handle_actions(out.actions),
-                    out.task.map(EditInstanceMessage),
-                ])
+            EditInstanceMessage(m) => {
+                if let Some(EditInstance(s)) = &mut self.overlay {
+                    let out = s.update(m, &mut self.state);
+                    return Task::batch([
+                        self.handle_actions(out.actions),
+                        out.task.map(EditInstanceMessage),
+                    ]);
+                }
             }
-            SettingsMessage(m) if let Some(Settings(s)) = &mut self.overlay => {
-                let out = s.update(m, &mut self.state);
-                Task::batch([
-                    self.handle_actions(out.actions),
-                    out.task.map(SettingsMessage),
-                ])
+            SettingsMessage(m) => {
+                if let Some(Settings(s)) = &mut self.overlay {
+                    let out = s.update(m, &mut self.state);
+                    return Task::batch([
+                        self.handle_actions(out.actions),
+                        out.task.map(SettingsMessage),
+                    ]);
+                }
             }
             CloseScreen => {
                 self.overlay = None;
-                Task::none()
             }
             CloseDialog => {
                 if let Some(dialog) = self.state.dialog.take()
@@ -252,7 +247,6 @@ impl GruntLauncher {
                     return Task::done(cancel);
                 }
                 self.state.dialog = None;
-                Task::none()
             }
             ConfirmDialog => {
                 if let Some(dialog) = self.state.dialog.take()
@@ -261,14 +255,12 @@ impl GruntLauncher {
                     return Task::done(confirm);
                 }
                 self.state.dialog = None;
-                Task::none()
             }
             UpdateProgress(status) => {
                 self.update_status = status;
-                Task::none()
             }
-            _ => Task::none(),
         }
+        Task::none()
     }
     fn handle_action(&mut self, action: GruntAction) -> Task<GruntMessage> {
         use GruntAction::*;
