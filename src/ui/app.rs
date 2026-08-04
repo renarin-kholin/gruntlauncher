@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
 use iced::{
-    Element, Size, Task,
+    Element, Size, Subscription, Task,
     alignment::Horizontal,
-    widget::{button, column, image::Handle, progress_bar, row, text},
+    event,
+    keyboard::{self, key},
+    widget::{button, column, image::Handle, operation, progress_bar, row, text},
     window::{icon, settings::PlatformSpecific},
 };
 use sipper::sipper;
@@ -47,6 +49,8 @@ pub enum GruntMessage {
     UpdateApplied(Result<(), UpdatesError>),
 
     UpdateProgress(UpdateStatus),
+
+    IcedEvent(iced::Event),
 }
 pub enum GruntAction {
     OpenAddInstance,
@@ -259,6 +263,20 @@ impl GruntLauncher {
             UpdateProgress(status) => {
                 self.update_status = status;
             }
+            IcedEvent(event) => {
+                if let iced::Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(key::Named::Tab),
+                    modifiers,
+                    ..
+                }) = event
+                {
+                    if modifiers.shift() {
+                        return operation::focus_previous();
+                    } else {
+                        return operation::focus_next();
+                    }
+                }
+            }
         }
         Task::none()
     }
@@ -328,6 +346,9 @@ impl GruntLauncher {
                 .collect::<Vec<_>>(),
         )
     }
+    fn subscription(&self) -> Subscription<GruntMessage> {
+        event::listen().map(GruntMessage::IcedEvent)
+    }
 }
 
 fn settings() -> iced::Settings {
@@ -359,6 +380,7 @@ pub fn run() -> iced::Result {
     )
     .settings(settings())
     .window(window_settings())
+    .subscription(GruntLauncher::subscription)
     .theme(grunt_theme())
     .title("Grunt Launcher")
     .run()
