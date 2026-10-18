@@ -1,17 +1,17 @@
 use std::{path::PathBuf, sync::Arc};
 
-use serde_json::{Value, json};
 use sipper::StreamExt;
 use thiserror::Error;
-use tokio::{io::AsyncWriteExt, process::Command};
+use tokio::io::AsyncWriteExt;
 use tokio_stream::wrappers::ReadDirStream;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::{
-    core::{account::Account, instance::GruntInstance, version::GameVersionSource},
-    services::instance::InstancesError::{ClientSettingsError, EditError},
-};
+use crate::core::instance::GruntInstance;
+
+mod launch;
+
+pub use launch::{launch_instance, patch_account_settings as patch_client_settings};
 
 #[derive(Error, Debug, Clone)]
 pub enum InstancesError {
@@ -32,6 +32,15 @@ pub enum InstancesError {
 
     #[error("Error while editing instance")]
     EditError,
+
+    #[error("The game version must be installed before launching this instance.")]
+    VersionNotInstalled,
+
+    #[error("Could not launch {executable}: {reason}")]
+    LaunchError { executable: PathBuf, reason: String },
+
+    #[error("Game exited with {status}. See {log_path} for details.")]
+    GameExited { status: String, log_path: PathBuf },
 }
 
 pub type Result<T> = std::result::Result<T, InstancesError>;
@@ -53,6 +62,7 @@ pub async fn delete_instance(instance: Uuid, instances_path: PathBuf) -> Result<
     tokio::fs::remove_dir_all(&instance_path).await?;
     Ok(())
 }
+
 pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance>> {
     tokio::fs::create_dir_all(&instances_path).await?;
     let dir = tokio::fs::read_dir(instances_path).await?;
@@ -65,11 +75,11 @@ pub async fn load_instances(instances_path: PathBuf) -> Result<Vec<GruntInstance
         {
             match toml::from_str::<GruntInstance>(&instance_config) {
                 Ok(instance) => {
-                    info!("Loaded instance config: {}", instance.name);
+                    info!(instance_name = instance.name, "Loaded instance config");
                     instances.push(instance)
                 }
-                Err(e) => {
-                    error!("Error trying to parse instance config: {}", e);
+                Err(error) => {
+                    error!(%error, "Error trying to parse instance config");
                 }
             }
         }
@@ -91,83 +101,13 @@ pub async fn add_instance(
 
     Ok(instance)
 }
+
 pub async fn save_instance(instance: GruntInstance, instances_path: PathBuf) -> Result<()> {
     let instance_path = instances_path.join(instance.id.to_string());
     tokio::fs::create_dir_all(&instance_path).await?;
-    if let Ok(mut instance_config) =
-        tokio::fs::File::create(instance_path.join("instance.toml")).await
-    {
-        instance_config
-            .write_all((toml::to_string(&instance)?).as_bytes())
-            .await?;
-    } else {
-        error!("Trying to edit an instance but its config doesn't exist.");
-        return Err(EditError);
-    }
-    Ok(())
-}
-
-pub async fn patch_client_settings(instance_path: PathBuf, account: Account) -> Result<()> {
-    let clientsettings_file = instance_path.join("clientsettings.json");
-    let root_text = match tokio::fs::read_to_string(&clientsettings_file).await {
-        Ok(text) => text,
-        Err(e) if e.kind() == tokio::io::ErrorKind::NotFound => "{}".to_string(),
-        Err(e) => return Err(e.into()),
-    };
-    let mut root: Value = serde_json::from_str(&root_text)?;
-    let ss = root
-        .as_object_mut()
-        .ok_or_else(|| ClientSettingsError("clientsettings.json root is not an object".into()))?
-        .entry("stringsettings")
-        .or_insert_with(|| json!({}))
-        .as_object_mut()
-        .ok_or_else(|| ClientSettingsError("stringsettings exists but is not an object".into()))?;
-    ss.insert("sessionkey".to_string(), json!(account.sessionkey));
-    ss.insert(
-        "sessionsignature".to_string(),
-        json!(account.sessionsignature),
-    );
-    ss.insert("playeruid".to_string(), json!(account.uid));
-    ss.insert("playername".to_string(), json!(account.username));
-    tokio::fs::write(&clientsettings_file, serde_json::to_string_pretty(&root)?).await?;
-    Ok(())
-}
-pub async fn launch_instance(
-    instance: GruntInstance,
-    instances_path: PathBuf,
-    account: Option<Account>,
-) -> Result<()> {
-    if let GameVersionSource::Local(game) = instance.version.source {
-        let data_path = instances_path.join(instance.id.to_string());
-        let mods_path = data_path.join("Mods");
-        #[cfg(not(target_os = "windows"))]
-        let run_path = game.path.join("run.sh");
-        #[cfg(target_os = "windows")]
-        let run_path = game.path.join("Vintagestory.exe");
-        debug!("{:?}", run_path);
-        debug!("{:?}", data_path);
-        debug!("{:?}", mods_path);
-        debug!(".{}", run_path.display());
-        tokio::fs::create_dir_all(mods_path.clone()).await?;
-        if let Some(account) = account {
-            match patch_client_settings(data_path.clone(), account).await {
-                Ok(()) => {
-                    info!("Successfully patched clientsettings.json")
-                }
-                Err(e) => {
-                    error!("{e}");
-                }
-            }
-        }
-        Command::new(run_path)
-            .arg("--dataPath")
-            .arg(data_path)
-            .arg("--addModPath")
-            .arg(mods_path)
-            .status()
-            .await?;
-    } else {
-        error!("Could not launch the game.")
-    }
+    let mut instance_config = tokio::fs::File::create(instance_path.join("instance.toml")).await?;
+    instance_config
+        .write_all((toml::to_string(&instance)?).as_bytes())
+        .await?;
     Ok(())
 }
