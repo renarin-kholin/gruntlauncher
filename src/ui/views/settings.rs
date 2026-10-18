@@ -25,6 +25,7 @@ pub enum Tab {
 }
 pub struct Screen {
     selected_tab: Tab,
+    banner_handle: image::Handle,
     instances_path: PathBuf,
     installations_path: PathBuf,
     changed: bool,
@@ -55,6 +56,8 @@ impl Screen {
         (
             Self {
                 selected_tab: Tab::default(),
+                // Reuse the image ID across view rebuilds so the renderer can cache it.
+                banner_handle: image::Handle::from_bytes(GRUNT_BANNER),
                 instances_path: state.config.instances_folder.clone(),
                 installations_path: state.config.installations_folder.clone(),
                 changed: false,
@@ -109,10 +112,9 @@ impl Screen {
         form.into()
     }
     pub fn view_about<'a>(&'a self, _state: &'a GruntState) -> Element<'a, Message> {
-        let icon = image::Handle::from_bytes(GRUNT_BANNER);
         center(
             column![
-                image(icon).height(200.0),
+                image(self.banner_handle.clone()).height(200.0),
                 row![space().width(Length::FillPortion(1)),
                 text!("GruntLauncher manages multiple Vintage Story game versions and instances side by side, so you can keep separate mod setups for different worlds or versions without them stepping on each other which is similar in spirit to launchers like Prism/MultiMC for Minecraft.").width(Length::FillPortion(2)).center(), 
 space().width(Length::FillPortion(1))

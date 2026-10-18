@@ -36,6 +36,7 @@ pub enum ModNavigation {
     Page(usize),
 }
 pub struct ModBrowser {
+    placeholder_icon: image::Handle,
     pub selected_mod: Option<i64>,
     pub selected_mod_release: Option<Release>,
     pub selected_mods: Vec<(Box<ModDetail>, Release)>,
@@ -72,6 +73,7 @@ impl Default for ModBrowser {
 impl ModBrowser {
     pub fn new() -> Self {
         Self {
+            placeholder_icon: image::Handle::from_bytes(GRUNT_ICON),
             selected_mod: None,
             selected_mod_release: None,
             selected_mods: vec![],
@@ -93,10 +95,11 @@ impl ModBrowser {
         moddb_mod: &'a ModListEntry,
     ) -> Element<'a, Message> {
         use Message::*;
-        let mut mod_logo = image::Handle::from_bytes(GRUNT_ICON);
-        if let Some(logo) = state.image_cache.peek(&moddb_mod.modid) {
-            mod_logo = logo.clone();
-        }
+        let mod_logo = state
+            .image_cache
+            .peek(&moddb_mod.modid)
+            .unwrap_or(&self.placeholder_icon)
+            .clone();
         let mut item_row = row![
             container(image(mod_logo).height(50.0).width(50.0)).style(container::bordered_box),
             column![
