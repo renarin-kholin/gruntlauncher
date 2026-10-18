@@ -6,8 +6,6 @@ use iced::{
     widget::{button, column, container, opaque, right, row, stack, text},
 };
 
-use crate::ui::theme::grunt_theme;
-
 pub fn overlay_container<'a, TMessage: 'a + Clone>(
     base: Element<'a, TMessage>,
     panel_children: Option<Element<'a, TMessage>>,
@@ -47,9 +45,10 @@ fn overlay_pane<'a, TMessage: 'a + Clone>(
     } else {
         Length::Fill
     };
-    let mut top_bar =
-        row![text!("{}", title).color(grunt_theme().extended_palette().secondary.strong.color)]
-            .align_y(Vertical::Center);
+    let mut top_bar = row![text!("{}", title).style(|theme: &Theme| text::Style {
+        color: Some(theme.extended_palette().secondary.strong.color),
+    })]
+    .align_y(Vertical::Center);
     if let Some(on_close) = on_close_maybe {
         top_bar = top_bar.push(right(
             button("×")

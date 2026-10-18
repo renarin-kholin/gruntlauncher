@@ -75,6 +75,14 @@ pub struct GruntLauncher {
 }
 
 impl GruntLauncher {
+    fn theme(&self) -> iced::Theme {
+        let choice = match &self.overlay {
+            Some(Screen::Settings(screen)) => screen.selected_theme(),
+            _ => self.state.config.theme,
+        };
+        grunt_theme(choice)
+    }
+
     pub fn new() -> (Self, Task<GruntMessage>) {
         (
             Self {
@@ -240,6 +248,23 @@ impl GruntLauncher {
                         out.task.map(SettingsMessage),
                     ]);
                 }
+                // A save can finish after the user has closed the settings overlay.
+                match m {
+                    settings::Message::ConfigSaved(Ok(config))
+                    | settings::Message::ConfigReset(Ok(config)) => {
+                        let paths_changed = self.state.config.instances_folder
+                            != config.instances_folder
+                            || self.state.config.installations_folder
+                                != config.installations_folder;
+                        self.state.config = config;
+                        if paths_changed {
+                            return self.handle_action(GruntAction::ReloadInstances);
+                        }
+                    }
+                    settings::Message::ConfigSaved(Err(error))
+                    | settings::Message::ConfigReset(Err(error)) => error!("{error}"),
+                    _ => {}
+                }
             }
             CloseScreen => {
                 self.overlay = None;
@@ -381,7 +406,56 @@ pub fn run() -> iced::Result {
     .settings(settings())
     .window(window_settings())
     .subscription(GruntLauncher::subscription)
-    .theme(grunt_theme())
+    .theme(GruntLauncher::theme)
     .title("Grunt Launcher")
     .run()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::config::ThemeChoice;
+
+    #[test]
+    fn theme_preview_discard_and_close_follow_saved_config() {
+        let (mut app, _) = GruntLauncher::new();
+        let original = app.theme().palette();
+        let _ = app.handle_action(GruntAction::OpenSettings);
+        let _ = app.update(GruntMessage::SettingsMessage(
+            settings::Message::ThemeChanged(ThemeChoice::LightHighContrast),
+        ));
+        assert_eq!(app.theme().palette().background, iced::Color::WHITE);
+        assert_eq!(app.state.config.theme, ThemeChoice::Default);
+
+        let _ = app.update(GruntMessage::SettingsMessage(
+            settings::Message::DiscardConfig,
+        ));
+        assert_eq!(app.theme().palette(), original);
+        let _ = app.update(GruntMessage::SettingsMessage(
+            settings::Message::ThemeChanged(ThemeChoice::LightHighContrast),
+        ));
+        let _ = app.update(GruntMessage::CloseScreen);
+        assert_eq!(app.theme().palette(), original);
+    }
+
+    #[test]
+    fn saved_theme_applies_after_closing_settings_and_after_config_reload() {
+        let (mut app, _) = GruntLauncher::new();
+        let mut saved = app.state.config.clone();
+        saved.theme = ThemeChoice::LightHighContrast;
+        let _ = app.handle_action(GruntAction::OpenSettings);
+        let _ = app.update(GruntMessage::CloseScreen);
+        let _ = app.update(GruntMessage::SettingsMessage(
+            settings::Message::ConfigSaved(Ok(saved.clone())),
+        ));
+        assert_eq!(app.state.config.theme, ThemeChoice::LightHighContrast);
+        assert_eq!(app.theme().palette().background, iced::Color::WHITE);
+
+        let source = toml::to_string_pretty(&saved).unwrap();
+        let (mut restarted, _) = GruntLauncher::new();
+        let _ = restarted.update(GruntMessage::ConfigLoaded(Ok(
+            toml::from_str(&source).unwrap()
+        )));
+        assert_eq!(restarted.theme().palette(), app.theme().palette());
+    }
 }

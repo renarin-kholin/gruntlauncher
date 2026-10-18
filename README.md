@@ -80,6 +80,30 @@ cargo run
 
 GruntLauncher stores config, cached data, and installed game/mod files in the OS-standard application directories (via the [`directories`](https://docs.rs/directories) crate), for example `~/.config/gruntlauncher`, `~/.cache/gruntlauncher`, and `~/.local/share/gruntlauncher` on Linux.
 
+## Theme
+
+Open **Settings → Theme** to choose a preset. Changes preview immediately; **Save**
+keeps the selection, while **Discard** or closing Settings restores the saved theme.
+
+- **Default** preserves the original GruntLauncher colors.
+- **Light High Contrast** uses black text on white, with dark action/status colors.
+- **Dark High Contrast** uses white text on black, with visible gray outlines and the original accent colors.
+
+All presets use Iced's standard interaction styles. Dark High Contrast overrides
+the border/separator shades to keep outlines visible on black. The TOML
+palettes live in [`theme/`](theme/) and are embedded in the executable at build time,
+so release archives and installers need no extra theme files or working-directory
+setup. Editing a bundled palette requires rebuilding the app.
+
+The selected preset is stored alongside the existing paths in `config.toml`:
+
+```toml
+theme = "dark-high-contrast" # or "default" / "light-high-contrast"
+```
+
+Older configs without a theme, and unknown preset names, use Default. Resetting all
+settings restores Default too. Third-party HTML descriptions can supply their own colors.
+
 ## Contributing
 
 Contributions are welcome. Just create a PR or an issue.
