@@ -5,15 +5,15 @@ use iced::{
     alignment::{Horizontal, Vertical},
     padding,
     widget::{
-        bottom, button, center, column, image, right, row, rule, scrollable, space, text,
-        text_input,
+        bottom, button, center, column, image, pick_list, right, row, rule, scrollable, space,
+        text, text_input,
     },
 };
 use tracing::error;
 
 use crate::{
     assets::GRUNT_BANNER,
-    core::config::Config,
+    core::config::{Config, ThemeChoice},
     services::config::{ConfigError, pick_folder, reset_config, save_config},
     ui::{GruntAction, GruntState, views::ScreenOutput},
 };
@@ -21,12 +21,14 @@ use crate::{
 pub enum Tab {
     #[default]
     General,
+    Theme,
     About,
 }
 pub struct Screen {
     selected_tab: Tab,
     instances_path: PathBuf,
     installations_path: PathBuf,
+    selected_theme: ThemeChoice,
     changed: bool,
     error: Option<String>,
 }
@@ -34,6 +36,7 @@ pub struct Screen {
 #[derive(Clone, Debug)]
 pub enum Message {
     Navigate(Tab),
+    ThemeChanged(ThemeChoice),
     EditInstancesPath,
     EditInstallationsPath,
 
@@ -46,7 +49,7 @@ pub enum Message {
     SaveConfig,
     DiscardConfig,
     ResetToDefault,
-    ConfigSaved(Result<(), ConfigError>),
+    ConfigSaved(Result<Config, ConfigError>),
     ConfigReset(Result<Config, ConfigError>),
 }
 
@@ -57,6 +60,7 @@ impl Screen {
                 selected_tab: Tab::default(),
                 instances_path: state.config.instances_folder.clone(),
                 installations_path: state.config.installations_folder.clone(),
+                selected_theme: state.config.theme,
                 changed: false,
                 error: None,
             },
@@ -65,6 +69,34 @@ impl Screen {
     }
     pub fn changed_maybe(&self, m: Message) -> Option<Message> {
         if self.changed { Some(m) } else { None }
+    }
+    pub fn selected_theme(&self) -> ThemeChoice {
+        self.selected_theme
+    }
+
+    fn config_actions(&self) -> Element<'_, Message> {
+        use Message::*;
+        bottom(right(
+            row![
+                button("Reset all settings").on_press(ResetToDefault),
+                button("Discard").on_press_maybe(self.changed_maybe(DiscardConfig)),
+                button("Save").on_press_maybe(self.changed_maybe(SaveConfig))
+            ]
+            .spacing(10.0),
+        ))
+        .into()
+    }
+
+    fn view_theme(&self) -> Element<'_, Message> {
+        let mut form = column![
+            text("Theme"),
+            pick_list(ThemeChoice::ALL, Some(self.selected_theme), Message::ThemeChanged),
+            text("Changes are previewed immediately. Save to keep them; Discard to restore the saved theme."),
+        ].spacing(10.0).padding(10.0);
+        if let Some(error) = &self.error {
+            form = form.push(text!("Error: {error}"));
+        }
+        form.push(self.config_actions()).into()
     }
     pub fn view_general<'a>(&'a self, _state: &'a GruntState) -> Element<'a, Message> {
         use Message::*;
@@ -98,14 +130,7 @@ impl Screen {
         if let Some(e) = &self.error {
             form = form.push(text!("Error: {e}"));
         }
-        form = form.push(bottom(right(
-            row![
-                button("Reset to defaults").on_press(ResetToDefault),
-                button("Discard").on_press_maybe(self.changed_maybe(DiscardConfig)),
-                button("Save").on_press_maybe(self.changed_maybe(SaveConfig))
-            ]
-            .spacing(10.0),
-        )));
+        form = form.push(self.config_actions());
         form.into()
     }
     pub fn view_about<'a>(&'a self, _state: &'a GruntState) -> Element<'a, Message> {
@@ -137,6 +162,15 @@ space().width(Length::FillPortion(1))
                             };
                             button::subtle(theme, status)
                         }),
+                    button("Theme")
+                        .on_press(Navigate(Tab::Theme))
+                        .width(Length::Fill)
+                        .style(|theme, mut status| {
+                            if self.selected_tab == Tab::Theme {
+                                status = button::Status::Pressed
+                            };
+                            button::subtle(theme, status)
+                        }),
                     button("About")
                         .on_press(Navigate(Tab::About))
                         .width(Length::Fill)
@@ -154,6 +188,7 @@ space().width(Length::FillPortion(1))
             rule::vertical(1.0),
             match self.selected_tab {
                 Tab::General => self.view_general(state),
+                Tab::Theme => self.view_theme(),
                 Tab::About => self.view_about(state),
             }
         ]
@@ -166,6 +201,10 @@ space().width(Length::FillPortion(1))
         match message {
             Navigate(tab) => {
                 self.selected_tab = tab;
+            }
+            ThemeChanged(theme) => {
+                self.selected_theme = theme;
+                self.changed(state);
             }
             EditInstancesPath => {
                 return ScreenOutput::task(Task::perform(
@@ -206,10 +245,15 @@ space().width(Length::FillPortion(1))
                 self.changed(state);
             }
             SaveConfig => {
-                state.config.instances_folder = self.instances_path.clone();
-                state.config.installations_folder = self.installations_path.clone();
+                let mut config = state.config.clone();
+                config.instances_folder = self.instances_path.clone();
+                config.installations_folder = self.installations_path.clone();
+                config.theme = self.selected_theme;
                 return ScreenOutput::task(Task::perform(
-                    save_config(state.config.clone()),
+                    async move {
+                        save_config(config.clone()).await?;
+                        Ok(config)
+                    },
                     ConfigSaved,
                 ));
             }
@@ -220,19 +264,26 @@ space().width(Length::FillPortion(1))
                 self.discard_changes(state);
             }
             ConfigSaved(result) => match result {
-                Ok(()) => {
-                    self.changed = false;
-                    return ScreenOutput::action(GruntAction::ReloadInstances);
+                Ok(config) => {
+                    let paths_changed = state.config.instances_folder != config.instances_folder
+                        || state.config.installations_folder != config.installations_folder;
+                    state.config = config;
+                    self.error = None;
+                    self.changed(state);
+                    if paths_changed {
+                        return ScreenOutput::action(GruntAction::ReloadInstances);
+                    }
                 }
                 Err(e) => {
                     error!("{e}");
-                    self.discard_changes(state);
+                    self.error = Some(e.to_string());
                 }
             },
             ConfigReset(result) => match result {
                 Ok(config) => {
                     self.changed = false;
                     state.config = config;
+                    self.discard_changes(state);
                     return ScreenOutput::action(GruntAction::ReloadInstances);
                 }
                 Err(e) => {
@@ -246,10 +297,57 @@ space().width(Length::FillPortion(1))
     fn discard_changes(&mut self, state: &mut GruntState) {
         self.instances_path = state.config.instances_folder.clone();
         self.installations_path = state.config.installations_folder.clone();
+        self.selected_theme = state.config.theme;
+        self.error = None;
         self.changed = false;
     }
     fn changed(&mut self, state: &GruntState) {
         self.changed = self.instances_path != state.config.instances_folder
-            || self.installations_path != state.config.installations_folder;
+            || self.installations_path != state.config.installations_folder
+            || self.selected_theme != state.config.theme;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn theme_save_commits_only_on_success_and_discard_clears_errors() {
+        let mut state = GruntState::default();
+        let (mut screen, _) = Screen::new(&mut state);
+        let _ = screen.update(
+            Message::ThemeChanged(ThemeChoice::LightHighContrast),
+            &mut state,
+        );
+        assert!(screen.changed);
+        let _ = screen.update(Message::SaveConfig, &mut state);
+        assert_eq!(state.config.theme, ThemeChoice::Default);
+
+        let _ = screen.update(
+            Message::ConfigSaved(Err(ConfigError::FolderSelectError)),
+            &mut state,
+        );
+        assert_eq!(state.config.theme, ThemeChoice::Default);
+        assert!(screen.error.is_some());
+        assert!(screen.changed);
+        let _ = screen.update(Message::DiscardConfig, &mut state);
+        assert_eq!(screen.selected_theme, ThemeChoice::Default);
+        assert!(screen.error.is_none());
+        assert!(!screen.changed);
+
+        let _ = screen.update(
+            Message::ThemeChanged(ThemeChoice::LightHighContrast),
+            &mut state,
+        );
+        let mut saved = state.config.clone();
+        saved.theme = ThemeChoice::LightHighContrast;
+        let output = screen.update(Message::ConfigSaved(Ok(saved)), &mut state);
+        assert_eq!(state.config.theme, ThemeChoice::LightHighContrast);
+        assert!(!screen.changed);
+        assert!(
+            output.actions.is_empty(),
+            "theme-only saves must not reload instances"
+        );
     }
 }

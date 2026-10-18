@@ -4,12 +4,11 @@ use iced::advanced::text;
 use iced::advanced::widget::{Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::{
-    Border, Color, Element, Event, Length, Point, Rectangle, Size, Vector, keyboard, mouse,
+    Border, Color, Element, Event, Length, Point, Rectangle, Size, Theme, Vector, keyboard, mouse,
 };
 
 use super::util::{estimate_width, fill_label};
 use crate::core::account::{Account, AccountStatus};
-use crate::ui::theme::grunt_theme;
 
 pub type Email = String;
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,7 +101,7 @@ fn status_color(status: AccountStatus, palette: &iced::theme::palette::Extended)
     }
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for AccountSwitcher<'a, Message>
+impl<'a, Message, Renderer> Widget<Message, Theme, Renderer> for AccountSwitcher<'a, Message>
 where
     Renderer: text::Renderer,
 {
@@ -174,7 +173,7 @@ where
         &self,
         tree: &Tree,
         renderer: &mut Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
@@ -182,7 +181,6 @@ where
     ) {
         let state = tree.state.downcast_ref::<SwitcherState>();
         let bounds = layout.bounds();
-        let theme = grunt_theme();
         let palette = theme.extended_palette();
         let hovered = cursor.is_over(bounds);
 
@@ -296,11 +294,10 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<AccountSwitcher<'a, Message>>
+impl<'a, Message, Renderer> From<AccountSwitcher<'a, Message>>
     for Element<'a, Message, Theme, Renderer>
 where
     Message: 'a,
-    Theme: 'a,
     Renderer: text::Renderer + 'a,
 {
     fn from(switcher: AccountSwitcher<'a, Message>) -> Self {
@@ -372,8 +369,7 @@ impl<'a, 'b, Message> Menu<'a, 'b, Message> {
     }
 }
 
-impl<'a, 'b, Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
-    for Menu<'a, 'b, Message>
+impl<'a, 'b, Message, Renderer> overlay::Overlay<Message, Theme, Renderer> for Menu<'a, 'b, Message>
 where
     Renderer: text::Renderer,
 {
@@ -503,13 +499,12 @@ where
     fn draw(
         &self,
         renderer: &mut Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
     ) {
         let bounds = layout.bounds();
-        let theme = grunt_theme();
         let palette = theme.extended_palette();
 
         renderer.fill_quad(

@@ -1,0 +1,8 @@
+# Black text on white, with dark action/status colors.
+# Iced keeps its standard panel shades, hover states, and disabled styles.
+background = "#FFFFFF"
+primary = "#0046A0"
+text = "#000000"
+success = "#0B4F1F"
+warning = "#6B3C00"
+danger = "#8B1010"

@@ -1,0 +1,7 @@
+# Original GruntLauncher palette. Iced generates widget shades from these colors.
+background = "#1D1816"
+primary = "#C08459"
+text = "#F3F0ED"
+success = "#839446"
+warning = "#C09C46"
+danger = "#945646"
