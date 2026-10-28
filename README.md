@@ -80,6 +80,10 @@ cargo run
 
 GruntLauncher stores config, cached data, and installed game/mod files in the OS-standard application directories (via the [`directories`](https://docs.rs/directories) crate), for example `~/.config/gruntlauncher`, `~/.cache/gruntlauncher`, and `~/.local/share/gruntlauncher` on Linux.
 
+Each instance's `launch.log` captures the game's output from its most recent launch,
+including runtime startup errors. Open the instance folder from the launcher to
+find it. Launch failures also appear in the sidebar and the launcher logs.
+
 ## Contributing
 
 Contributions are welcome. Just create a PR or an issue.

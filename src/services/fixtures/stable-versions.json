@@ -1,0 +1,130 @@
+{
+  "1.22.7": {
+    "linux": {
+      "filename": "vs_client_linux-x64_1.22.7.tar.gz",
+      "filesize": "590.5 MB",
+      "md5": "ecfa56411b0a2912ebba29839fa98a3f",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_client_linux-x64_1.22.7.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_client_linux-x64_1.22.7.tar.gz"
+      },
+      "latest": 1
+    },
+    "windows": {
+      "filename": "vs_install_win-x64_1.22.7.exe",
+      "filesize": "570.4 MB",
+      "md5": "a979e06e76430b8669351cf07b314238",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_install_win-x64_1.22.7.exe",
+        "local": "https://account.vintagestory.at/files/stable/vs_install_win-x64_1.22.7.exe"
+      },
+      "latest": 1
+    },
+    "windowsupdate": {
+      "filename": "vs_update_win-x64_1.22.7.exe",
+      "filesize": "107.3 MB",
+      "md5": "60d2ada961a5db50103163e7c583900d",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_update_win-x64_1.22.7.exe",
+        "local": "https://account.vintagestory.at/files/stable/vs_update_win-x64_1.22.7.exe"
+      },
+      "latest": 1
+    },
+    "linuxserver": {
+      "filename": "vs_server_linux-x64_1.22.7.tar.gz",
+      "filesize": "51.4 MB",
+      "md5": "3031212903b1c283084d5fe0cda6bce6",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_1.22.7.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_server_linux-x64_1.22.7.tar.gz"
+      },
+      "latest": 1
+    },
+    "windowsserver": {
+      "filename": "vs_server_win-x64_1.22.7.zip",
+      "filesize": "61.4 MB",
+      "md5": "c5bcd15a558041533ed3b88f707bb19e",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_server_win-x64_1.22.7.zip",
+        "local": "https://account.vintagestory.at/files/stable/vs_server_win-x64_1.22.7.zip"
+      },
+      "latest": 1
+    },
+    "mac-x64": {
+      "filename": "vs_client_osx-x64_1.22.7.tar.gz",
+      "filesize": "613.9 MB",
+      "md5": "ce128ea84493ad94b261d119de6102d1",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_client_osx-x64_1.22.7.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_client_osx-x64_1.22.7.tar.gz"
+      },
+      "latest": 1
+    },
+    "mac-arm64": {
+      "filename": "vs_client_osx-arm64_1.22.7.tar.gz",
+      "filesize": "608.1 MB",
+      "md5": "89c30d05b51bd7444cd0c2e405c9061c",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_client_osx-arm64_1.22.7.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_client_osx-arm64_1.22.7.tar.gz"
+      },
+      "latest": 1
+    }
+  },
+  "1.22.2": {
+    "windowsupdate": {
+      "filename": "vs_update_win-x64_1.22.2.exe",
+      "filesize": "107.1 MB",
+      "md5": "4015a5153a689829fdd22d54fe261510",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_update_win-x64_1.22.2.exe",
+        "local": "https://account.vintagestory.at/files/stable/vs_update_win-x64_1.22.2.exe"
+      }
+    },
+    "windowsserver": {
+      "filename": "vs_server_win-x64_1.22.2.zip",
+      "filesize": "61.1 MB",
+      "md5": "82ec1cb0e18702a7e3ff5ed418aa38cc",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_server_win-x64_1.22.2.zip",
+        "local": "https://account.vintagestory.at/files/stable/vs_server_win-x64_1.22.2.zip"
+      }
+    },
+    "linux": {
+      "filename": "vs_client_linux-x64_1.22.2.tar.gz",
+      "filesize": "590.2 MB",
+      "md5": "2370eb6cac1b10c7990e4678b4d3c87e",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_client_linux-x64_1.22.2.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_client_linux-x64_1.22.2.tar.gz"
+      }
+    },
+    "windows": {
+      "filename": "vs_install_win-x64_1.22.2.exe",
+      "filesize": "570.2 MB",
+      "md5": "536ed4f24c6bf0e25e56cfe327e81bd9",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_install_win-x64_1.22.2.exe",
+        "local": "https://account.vintagestory.at/files/stable/vs_install_win-x64_1.22.2.exe"
+      }
+    },
+    "linuxserver": {
+      "filename": "vs_server_linux-x64_1.22.2.tar.gz",
+      "filesize": "51.1 MB",
+      "md5": "320ca3b8981ae8ea42d7033a1d20c3b4",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_1.22.2.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_server_linux-x64_1.22.2.tar.gz"
+      }
+    },
+    "mac-x64": {
+      "filename": "vs_client_osx-x64_1.22.2.tar.gz",
+      "filesize": "613.5 MB",
+      "md5": "2aed66d315ad56e307795e093ed315de",
+      "urls": {
+        "cdn": "https://cdn.vintagestory.at/gamefiles/stable/vs_client_osx-x64_1.22.2.tar.gz",
+        "local": "https://account.vintagestory.at/files/stable/vs_client_osx-x64_1.22.2.tar.gz"
+      }
+    }
+  }
+}
