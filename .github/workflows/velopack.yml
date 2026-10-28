@@ -2,8 +2,8 @@ name: Velopack
 
 # Runs on the tag created when the release-please PR is merged (pushed with a
 # PAT, which is what allows it to trigger this workflow). Builds Velopack
-# packages (Windows Setup.exe, Linux AppImage) and attaches them to the
-# GitHub Release that release-please already created.
+# packages (Windows Setup.exe, Linux AppImage, macOS .app bundle + installer)
+# and attaches them to the GitHub Release that release-please already created.
 on:
   push:
     tags:
@@ -32,13 +32,31 @@ jobs:
             target: x86_64-unknown-linux-gnu
             exe: gruntlauncher
             icon: assets/icons/logo.png
+          # Intel build is cross-compiled on the arm64 runner. The channel is
+          # explicit because vpk would otherwise default to the runner's arch.
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            exe: gruntlauncher
+            icon: assets/icons/logo.icns
+            channel: osx-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            exe: gruntlauncher
+            icon: assets/icons/logo.icns
+            channel: osx-x64
     defaults:
       run:
         shell: bash
+    env:
+      CHANNEL_ARGS: ${{ matrix.channel && format('--channel {0}', matrix.channel) || '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Install mold (Linux)
         if: runner.os == 'Linux'
@@ -62,7 +80,7 @@ jobs:
       # to download, so only full packages are produced.
       - name: Download previous release
         continue-on-error: true
-        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
+        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" ${CHANNEL_ARGS} --token "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Pack
         run: |
@@ -72,7 +90,8 @@ jobs:
             -p vpk-stage \
             -e "${{ matrix.exe }}" \
             --packTitle "$PACK_TITLE" \
-            --icon "${{ matrix.icon }}"
+            --icon "${{ matrix.icon }}" \
+            ${CHANNEL_ARGS}
 
       - name: Upload to GitHub Release
         run: |
@@ -80,5 +99,6 @@ jobs:
             --repoUrl "https://github.com/${{ github.repository }}" \
             --token "${{ secrets.GITHUB_TOKEN }}" \
             --merge \
+            ${CHANNEL_ARGS} \
             --tag "$GITHUB_REF_NAME" \
             --releaseName "$GITHUB_REF_NAME"
