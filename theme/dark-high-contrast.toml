@@ -1,0 +1,9 @@
+# White text on black, keeping the original GruntLauncher accent colors.
+# Iced's usual border shades are too close to pure black; use a visible gray.
+background = "#000000"
+primary = "#C08459"
+text = "#FFFFFF"
+success = "#839446"
+warning = "#C09C46"
+danger = "#945646"
+border = "#666666"

@@ -4,12 +4,11 @@ use iced::advanced::text::{self, Text};
 use iced::advanced::widget::{Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell, overlay};
 use iced::{
-    Border, Color, Element, Event, Length, Pixels, Point, Rectangle, Size, Vector, alignment,
-    keyboard, mouse,
+    Border, Color, Element, Event, Length, Pixels, Point, Rectangle, Size, Theme, Vector,
+    alignment, keyboard, mouse,
 };
 
 use crate::services::game_mod::Release;
-use crate::ui::theme::grunt_theme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Status {
@@ -36,8 +35,7 @@ fn status(release: &Release, game_version: &semver::Version) -> Status {
     Status::Old
 }
 
-fn dot_color(s: Status) -> Color {
-    let palette = grunt_theme().palette();
+fn dot_color(s: Status, palette: iced::theme::Palette) -> Color {
     match s {
         Status::Ok => palette.success,
         Status::Maybe => palette.warning,
@@ -45,8 +43,7 @@ fn dot_color(s: Status) -> Color {
     }
 }
 
-fn accent_color(s: Status) -> Color {
-    let palette = grunt_theme().palette();
+fn accent_color(s: Status, palette: iced::theme::Palette) -> Color {
     match s {
         Status::Ok => palette.success,
         Status::Maybe => palette.warning,
@@ -122,7 +119,7 @@ impl<'a, Message> ReleasePicker<'a, Message> {
     }
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for ReleasePicker<'a, Message>
+impl<'a, Message, Renderer> Widget<Message, Theme, Renderer> for ReleasePicker<'a, Message>
 where
     Renderer: text::Renderer,
 {
@@ -188,7 +185,7 @@ where
         &self,
         tree: &Tree,
         renderer: &mut Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
@@ -202,7 +199,7 @@ where
             None => ("-".to_string(), Status::Old),
         };
 
-        let palette = grunt_theme().palette();
+        let palette = theme.palette();
         let border_color = match st {
             Status::Ok => palette.success,
             Status::Maybe => palette.warning,
@@ -237,7 +234,7 @@ where
                 },
                 ..Quad::default()
             },
-            dot_color(st),
+            dot_color(st, theme.palette()),
         );
 
         fill_label(
@@ -291,11 +288,10 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<ReleasePicker<'a, Message>>
+impl<'a, Message, Renderer> From<ReleasePicker<'a, Message>>
     for Element<'a, Message, Theme, Renderer>
 where
     Message: 'a,
-    Theme: 'a,
     Renderer: text::Renderer + 'a,
 {
     fn from(picker: ReleasePicker<'a, Message>) -> Self {
@@ -424,7 +420,7 @@ impl<'a, 'b, Message> Popover<'a, 'b, Message> {
     }
 }
 
-impl<'a, 'b, Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
+impl<'a, 'b, Message, Renderer> overlay::Overlay<Message, Theme, Renderer>
     for Popover<'a, 'b, Message>
 where
     Renderer: text::Renderer,
@@ -567,15 +563,14 @@ where
     fn draw(
         &self,
         renderer: &mut Renderer,
-        _theme: &Theme,
+        theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
     ) {
         let bounds = layout.bounds();
 
-        let palette = grunt_theme();
-        let palette = palette.extended_palette();
+        let palette = theme.extended_palette();
         renderer.fill_quad(
             Quad {
                 bounds,
@@ -663,7 +658,7 @@ where
                 let (fg, dot) = if is_detail {
                     (palette.primary.base.text, palette.primary.base.text)
                 } else {
-                    (palette.background.base.text, dot_color(st))
+                    (palette.background.base.text, dot_color(st, theme.palette()))
                 };
 
                 renderer.fill_quad(
@@ -764,7 +759,7 @@ where
             &icon,
             Point::new(x0, y),
             12.0,
-            accent_color(st),
+            accent_color(st, theme.palette()),
             text::Alignment::Left,
             detail,
         );
@@ -776,7 +771,7 @@ where
                 &wrapped,
                 Point::new(line_x, y),
                 12.0,
-                accent_color(st),
+                accent_color(st, theme.palette()),
                 text::Alignment::Left,
                 detail,
             );
