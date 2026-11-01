@@ -45,8 +45,12 @@ struct VSAPIVersion {
     windows: VSAPIVersionFileObject,
     #[cfg(target_os = "linux")]
     linux: VSAPIVersionFileObject,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", test))]
+    #[serde(rename = "mac-x64")]
     mac_x64: VSAPIVersionFileObject,
+    #[cfg(any(target_os = "macos", test))]
+    #[serde(rename = "mac-arm64")]
+    mac_arm64: Option<VSAPIVersionFileObject>,
 }
 
 impl VSAPIVersion {
@@ -56,7 +60,17 @@ impl VSAPIVersion {
         #[cfg(target_os = "linux")]
         return self.linux;
         #[cfg(target_os = "macos")]
-        return self.mac_x64;
+        return self.mac_file_object(std::env::consts::ARCH);
+    }
+
+    #[cfg(any(target_os = "macos", test))]
+    fn mac_file_object(self, architecture: &str) -> VSAPIVersionFileObject {
+        if architecture == "aarch64" {
+            // Older releases only offer an Intel build.
+            self.mac_arm64.unwrap_or(self.mac_x64)
+        } else {
+            self.mac_x64
+        }
     }
 }
 #[derive(Debug, Serialize, Deserialize)]
@@ -325,32 +339,46 @@ pub async fn install_game(
         progress,
     )
     .await;
-    #[cfg(not(target_os = "windows"))]
-    return extract_archive(
-        gameversion,
-        archive_path,
-        versions_path,
-        install_path,
-        progress,
-    )
-    .await;
+    #[cfg(target_os = "linux")]
+    return linux_install(archive_path, install_path).await;
+    #[cfg(target_os = "macos")]
+    return macos_install(archive_path, install_path).await;
 }
-#[cfg(not(target_os = "windows"))]
-pub async fn extract_archive(
-    _gameversion: GameVersion,
-    archive_path: PathBuf,
-    _versions_path: PathBuf,
-    install_path: PathBuf,
-    _progress: &mut sipper::Sender<InstallStatus>,
-) -> Result<PathBuf> {
-    let extract_child = Command::new("tar")
+#[cfg(target_os = "linux")]
+async fn linux_install(archive_path: PathBuf, install_path: PathBuf) -> Result<PathBuf> {
+    let status = Command::new("tar")
         .arg("-xzf")
         .arg(archive_path.as_os_str())
         .arg("-C")
         .arg(install_path.as_os_str())
         .arg("--strip-components=1")
-        .status();
-    if extract_child.await?.success() {
+        .status()
+        .await?;
+    if status.success() {
+        Ok(install_path)
+    } else {
+        Err(VersionsError::InstallerError(
+            "extract process exited with a non 0 exit code.".to_string(),
+        ))
+    }
+}
+/// On macOS, game installations keep the original `Vintage Story.app` bundle,
+/// including its display settings in `Info.plist`. Older launcher builds stripped
+/// this wrapper, which can cause quarter-screen rendering on Retina displays. If
+/// the launcher reports a missing app bundle, restore the original `.app` from the
+/// game archive inside that version's installation folder. Instance data stays in
+/// its separate instance folder.
+#[cfg(target_os = "macos")]
+async fn macos_install(archive_path: PathBuf, install_path: PathBuf) -> Result<PathBuf> {
+    // Keep the .app wrapper so macOS reads its Info.plist, including Retina settings.
+    let status = Command::new("tar")
+        .arg("-xzf")
+        .arg(archive_path.as_os_str())
+        .arg("-C")
+        .arg(install_path.as_os_str())
+        .status()
+        .await?;
+    if status.success() {
         Ok(install_path)
     } else {
         Err(VersionsError::InstallerError(
@@ -449,5 +477,113 @@ async fn windows_install(
             .send(InstallStatus::Failed(install_error.clone()))
             .await;
         Err(install_error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn installation_preserves_platform_archive_layout() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root =
+            std::env::temp_dir().join(format!("gruntlauncher archive {}", uuid::Uuid::new_v4()));
+        let source = root.join("source");
+        #[cfg(target_os = "macos")]
+        let folder = "Vintage Story.app";
+        #[cfg(target_os = "linux")]
+        let folder = "vintagestory";
+        let contents = source.join(folder);
+        std::fs::create_dir_all(&contents).unwrap();
+        let plist = "<?xml version=\"1.0\"?><plist version=\"1.0\"><dict><key>NSHighResolutionCapable</key><false/></dict></plist>";
+        std::fs::write(contents.join("Info.plist"), plist).unwrap();
+        std::fs::write(contents.join("Vintagestory"), "#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(
+            contents.join("Vintagestory"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        let archive = root.join("game.tar.gz");
+        assert!(
+            Command::new("tar")
+                .arg("-czf")
+                .arg(&archive)
+                .arg("-C")
+                .arg(&source)
+                .arg(folder)
+                .status()
+                .await
+                .unwrap()
+                .success()
+        );
+        let version = GameVersion::local(semver::Version::new(1, 0, 0), &contents);
+        let installed = sipper::sipper(async |mut progress| {
+            install_game(version, archive, root.join("installed"), &mut progress).await
+        })
+        .await
+        .unwrap();
+        assert_eq!(installed, root.join("installed/1.0.0"));
+        #[cfg(target_os = "macos")]
+        let installed = installed.join(folder);
+        assert_eq!(
+            std::fs::read_to_string(installed.join("Info.plist")).unwrap(),
+            plist
+        );
+        assert_ne!(
+            std::fs::metadata(installed.join("Vintagestory"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o111,
+            0
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    // Real API entries with both Mac architectures, and an older Intel-only release.
+    const MANIFEST: &str = include_str!("fixtures/stable-versions.json");
+
+    fn release(version: &str) -> VSAPIVersion {
+        serde_json::from_str::<HashMap<String, VSAPIVersion>>(MANIFEST)
+            .unwrap()
+            .remove(version)
+            .unwrap()
+    }
+
+    #[test]
+    fn mac_downloads_use_hyphenated_api_keys_and_native_architecture() {
+        for (architecture, filename) in [
+            ("aarch64", "vs_client_osx-arm64_1.22.7.tar.gz"),
+            ("x86_64", "vs_client_osx-x64_1.22.7.tar.gz"),
+        ] {
+            let file = release("1.22.7").mac_file_object(architecture);
+            assert_eq!(file.filename, filename);
+            assert!(file.urls.cdn.ends_with(filename));
+            assert!(!file.md5.is_empty());
+        }
+    }
+
+    #[test]
+    fn intel_only_releases_still_load_on_apple_silicon() {
+        for architecture in ["aarch64", "x86_64"] {
+            let file = release("1.22.2").mac_file_object(architecture);
+            assert_eq!(file.filename, "vs_client_osx-x64_1.22.2.tar.gz");
+        }
+    }
+
+    #[test]
+    fn download_selection_matches_the_launcher_target() {
+        let filename = release("1.22.7").file_object().filename;
+        #[cfg(target_os = "windows")]
+        assert_eq!(filename, "vs_install_win-x64_1.22.7.exe");
+        #[cfg(target_os = "linux")]
+        assert_eq!(filename, "vs_client_linux-x64_1.22.7.tar.gz");
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        assert_eq!(filename, "vs_client_osx-arm64_1.22.7.tar.gz");
+        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+        assert_eq!(filename, "vs_client_osx-x64_1.22.7.tar.gz");
     }
 }

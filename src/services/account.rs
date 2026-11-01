@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, io, path::Path, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -76,18 +76,23 @@ pub enum LoginStatus {
     Failed,
 }
 pub async fn load_session() -> Result<AccountStore> {
-    let data_dir = paths::data_dir()?;
-    tokio::fs::create_dir_all(&data_dir).await?;
-    let session_path = data_dir.join("session.toml");
-    let session_file_content = tokio::fs::read_to_string(session_path).await?;
-    //TODO: check if the session is valid or expired
-    Ok(toml::from_str(&session_file_content)?)
+    // TODO: check if the session is valid or expired.
+    load_session_from(&paths::data_dir()?.join("session.toml")).await
+}
+
+async fn load_session_from(session_path: &Path) -> Result<AccountStore> {
+    match tokio::fs::read_to_string(session_path).await {
+        Ok(contents) => Ok(toml::from_str(&contents)?),
+        // No store exists until the user saves their first account.
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(AccountStore::default()),
+        Err(error) => Err(error.into()),
+    }
 }
 pub async fn save_account(account: Account) -> Result<()> {
     let data_dir = paths::data_dir()?;
     tokio::fs::create_dir_all(&data_dir).await?;
     let session_path = data_dir.join("session.toml");
-    let mut accounts_store = load_session().await.unwrap_or_default();
+    let mut accounts_store = load_session().await?;
     if let Some(existing) = accounts_store
         .accounts
         .iter_mut()
@@ -177,4 +182,82 @@ pub async fn validate_session(account: Account) -> Result<bool> {
     let response_text = response.text().await?;
     let parsed_response: ClientValidateResponse = serde_json::from_str(&response_text)?;
     Ok(parsed_response.valid == 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    struct SessionDir(PathBuf);
+
+    impl SessionDir {
+        fn new() -> Self {
+            let path = std::env::temp_dir()
+                .join(format!("gruntlauncher-accounts-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for SessionDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_session_is_an_empty_store_without_creating_files() {
+        let directory = SessionDir::new();
+        for path in [
+            directory.0.join("session.toml"),
+            directory.0.join("new-user/session.toml"),
+        ] {
+            assert_eq!(
+                load_session_from(&path).await.unwrap(),
+                AccountStore::default()
+            );
+            assert!(!path.exists());
+        }
+        assert!(!directory.0.join("new-user").exists());
+    }
+
+    #[tokio::test]
+    async fn existing_accounts_and_selected_account_are_loaded() {
+        let directory = SessionDir::new();
+        let path = directory.0.join("session.toml");
+        let store = AccountStore {
+            accounts: vec![Account::new(
+                "test-player",
+                "test@example.invalid",
+                AccountStatus::Ok,
+                "test-session-key".into(),
+                "test-signature".into(),
+                "test-uid".into(),
+            )],
+            selected_account: Some("test-player".into()),
+        };
+        let contents = toml::to_string(&store).unwrap();
+        tokio::fs::write(&path, &contents).await.unwrap();
+        assert_eq!(load_session_from(&path).await.unwrap(), store);
+        assert_eq!(tokio::fs::read_to_string(path).await.unwrap(), contents);
+    }
+
+    #[tokio::test]
+    async fn invalid_stores_and_other_read_errors_are_not_treated_as_first_run() {
+        let directory = SessionDir::new();
+        let path = directory.0.join("session.toml");
+        let contents = "accounts = [invalid TOML";
+        tokio::fs::write(&path, contents).await.unwrap();
+        assert!(matches!(
+            load_session_from(&path).await,
+            Err(AccountsError::DeserializeError(_))
+        ));
+        assert_eq!(tokio::fs::read_to_string(path).await.unwrap(), contents);
+        // Reading a directory fails on Unix and Windows, without relying on file permissions.
+        assert!(matches!(
+            load_session_from(&directory.0).await,
+            Err(AccountsError::Io(_))
+        ));
+    }
 }

@@ -8,7 +8,7 @@ use iced::{
         scrollable, space, text, text_input,
     },
 };
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::{
     assets::GRUNT_ICON,
@@ -51,6 +51,7 @@ impl LoginDetail {
 pub struct Screen {
     selected_instance: Option<InstanceId>,
     icon_handles: Vec<Handle>,
+    launch_error: Option<String>,
 
     //Login form state
     show_login: bool,
@@ -111,6 +112,7 @@ impl Screen {
         Self {
             selected_instance: None,
             icon_handles: vec![Handle::from_bytes(GRUNT_ICON)],
+            launch_error: None,
 
             //Login Fields
             show_login: false,
@@ -239,6 +241,9 @@ impl Screen {
         } else {
             sidebar = sidebar.push(text!("No instance selected"));
         }
+        if let Some(error) = &self.launch_error {
+            sidebar = sidebar.push(text(error).size(14).style(text::danger));
+        }
         sidebar
             .push(
                 button(center_x("Launch"))
@@ -347,8 +352,10 @@ impl Screen {
             }
             SelectInstance(id) => {
                 self.selected_instance = Some(id);
+                self.launch_error = None;
             }
             LaunchInstance => {
+                self.launch_error = None;
                 if let Some(selected_instance) = self.selected_instance {
                     let instance = state
                         .instances
@@ -369,7 +376,12 @@ impl Screen {
                 }
             }
             InstanceLaunched(result) => {
-                debug!("{result:?}");
+                if let Err(error) = result {
+                    error!(%error, "Failed to launch instance");
+                    self.launch_error = Some(error.to_string());
+                } else {
+                    info!("Game exited normally");
+                }
             }
             AccountSelected(username) => {
                 state.selected_account = Some(username.clone());
@@ -477,7 +489,7 @@ impl Screen {
             }
             SessionSaved(result) => match result {
                 Ok(()) => info!("Updated session"),
-                Err(e) => error!("{e}"),
+                Err(error) => error!(%error, "Failed to save session"),
             },
             SessionValidated(result) => match result {
                 Ok(true) => info!("Session is valid."),
@@ -498,7 +510,7 @@ impl Screen {
                         ));
                     }
                 }
-                Err(e) => error!("{e}"),
+                Err(error) => error!(%error, "Failed to validate session"),
             },
             OpenInstanceFolder => {
                 if let Some(selected_instance) = self.selected_instance {
@@ -508,8 +520,8 @@ impl Screen {
                         Ok(()) => {
                             info!("Opened {:?} in the default application.", instance_folder);
                         }
-                        Err(e) => {
-                            error!("Error when trying to open a folder: {e}");
+                        Err(error) => {
+                            error!(%error, "Error when trying to open a folder");
                         }
                     }
                 }
@@ -524,8 +536,8 @@ impl Screen {
                         Ok(()) => {
                             info!("Opened {:?} in the default application.", mod_folder);
                         }
-                        Err(e) => {
-                            error!("Error when trying to open a folder: {e}");
+                        Err(error) => {
+                            error!(%error, "Error when trying to open a folder");
                         }
                     }
                 }
@@ -565,8 +577,8 @@ impl Screen {
             }
             DeleteResult(result) => match result {
                 Ok(()) => {}
-                Err(e) => {
-                    error!("Error while deleting instance: {e}");
+                Err(error) => {
+                    error!(%error, "Error while deleting instance");
                 }
             },
         }
