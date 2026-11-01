@@ -39,7 +39,7 @@ GruntLauncher manages multiple Vintage Story game versions and instances side by
 |---|---|
 | Linux | Supported |
 | Windows | Supported (installs via the official silent installer) |
-| macOS | Not yet supported (Looking for testers, I do not own a mac so I haven't been able to test it) |
+| macOS | Supported (Credits: [real-felix](https://github.com/real-felix)) |
 
 ## Installation
 
