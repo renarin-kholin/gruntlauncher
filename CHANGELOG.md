@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5](https://github.com/renarin-kholin/gruntlauncher/compare/v0.2.4...v0.2.5) (2026-11-01)
+
+
+### Features
+
+* add theming + 2 high contrast themes ([#44](https://github.com/renarin-kholin/gruntlauncher/issues/44)) ([cdca173](https://github.com/renarin-kholin/gruntlauncher/commit/cdca17335764711507c178428235b06087328d87))
+
+
+### Bug Fixes
+
+* keep the image handler around instead of recreating it every frame ([#43](https://github.com/renarin-kholin/gruntlauncher/issues/43)) ([66711ab](https://github.com/renarin-kholin/gruntlauncher/commit/66711ab888b7e496035c6e4ccfe8fedb04afefdb))
+
+
+### Documentation
+
+* update readme with macos support ([#50](https://github.com/renarin-kholin/gruntlauncher/issues/50)) ([fd92f84](https://github.com/renarin-kholin/gruntlauncher/commit/fd92f84663e56ceadaf83ad65847dab9277b3c3f))
+
 ## [0.2.4](https://github.com/renarin-kholin/gruntlauncher/compare/v0.2.3...v0.2.4) (2026-10-28)
 
 
