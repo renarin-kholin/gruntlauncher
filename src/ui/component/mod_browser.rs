@@ -1,6 +1,3 @@
-use std::cmp::{max, min};
-use std::collections::HashSet;
-
 use iced::{
     Element, Font, Length, Task,
     alignment::{Horizontal, Vertical},
@@ -12,6 +9,8 @@ use iced::{
 };
 use iced_aw::spinner;
 use iced_blitzview::web_view;
+use std::cmp::{max, min};
+use std::collections::HashSet;
 
 use crate::core::game_mod::GameMod;
 use crate::ui::GruntAction;
@@ -307,7 +306,8 @@ impl ModBrowser {
                             text!("Search"),
                             row![
                                 text_input("Search for mods", &self.mod_search_query)
-                                    .on_input(SearchChanged),
+                                    .on_input(SearchChanged)
+                                    .on_submit_maybe(Some(Search)),
                                 button("Search").on_press(Search).style(
                                     move |theme, mut status| {
                                         if self.mod_search_query.len() < 4 {
@@ -369,6 +369,9 @@ impl ModBrowser {
                 self.mod_search_query = query;
             }
             Search => {
+                if self.mod_search_query.len() < 4 {
+                    return ScreenOutput::none();
+                }
                 self.mod_search_results = ModSearchState::Loading;
                 return ScreenOutput::task(Task::perform(
                     search_mods(self.mod_search_query.clone()),
