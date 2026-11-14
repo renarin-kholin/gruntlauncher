@@ -439,11 +439,119 @@ fn build_document(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+
+    /// Encodes a solid-color RGB PNG using stored (uncompressed) deflate blocks,
+    /// so the test needs no image-encoding dependency.
+    fn solid_png(width: u32, height: u32, rgb: [u8; 3]) -> Vec<u8> {
+        fn crc32(data: &[u8]) -> u32 {
+            let mut crc = 0xFFFF_FFFFu32;
+            for &byte in data {
+                crc ^= u32::from(byte);
+                for _ in 0..8 {
+                    crc = if crc & 1 != 0 {
+                        (crc >> 1) ^ 0xEDB8_8320
+                    } else {
+                        crc >> 1
+                    };
+                }
+            }
+            !crc
+        }
+        fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+            out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+            let start = out.len();
+            out.extend_from_slice(kind);
+            out.extend_from_slice(data);
+            let crc = crc32(&out[start..]);
+            out.extend_from_slice(&crc.to_be_bytes());
+        }
+
+        let mut raw = Vec::with_capacity(((width * 3 + 1) * height) as usize);
+        for _ in 0..height {
+            raw.push(0); // filter: none
+            raw.extend_from_slice(&rgb.repeat(width as usize));
+        }
+
+        let mut zlib = vec![0x78, 0x01];
+        let blocks: Vec<&[u8]> = raw.chunks(65_535).collect();
+        for (i, block) in blocks.iter().enumerate() {
+            zlib.push(u8::from(i == blocks.len() - 1));
+            let len = block.len() as u16;
+            zlib.extend_from_slice(&len.to_le_bytes());
+            zlib.extend_from_slice(&(!len).to_le_bytes());
+            zlib.extend_from_slice(block);
+        }
+        let (mut a, mut b) = (1u32, 0u32);
+        for &byte in &raw {
+            a = (a + u32::from(byte)) % 65_521;
+            b = (b + a) % 65_521;
+        }
+        zlib.extend_from_slice(&((b << 16) | a).to_be_bytes());
+
+        let mut ihdr = Vec::new();
+        ihdr.extend_from_slice(&width.to_be_bytes());
+        ihdr.extend_from_slice(&height.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 2, 0, 0, 0]); // 8-bit RGB
+
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        chunk(&mut png, b"IHDR", &ihdr);
+        chunk(&mut png, b"IDAT", &zlib);
+        chunk(&mut png, b"IEND", &[]);
+        png
+    }
+
+    /// Serves `/redirect` as a 302 to `/photo.png`, which serves `png`.
+    /// Returns the base URL of the server.
+    fn serve_image(png: Vec<u8>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut request_line = String::new();
+                if reader.read_line(&mut request_line).is_err() {
+                    continue;
+                }
+                // Drain headers.
+                let mut line = String::new();
+                while reader.read_line(&mut line).is_ok_and(|n| n > 2) {
+                    line.clear();
+                }
+                let path = request_line.split_whitespace().nth(1).unwrap_or("");
+                let _ = if path == "/redirect" {
+                    stream.write_all(
+                        b"HTTP/1.1 302 Found\r\nLocation: /photo.png\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    )
+                } else if path == "/photo.png" {
+                    let header = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        png.len()
+                    );
+                    stream
+                        .write_all(header.as_bytes())
+                        .and_then(|()| stream.write_all(&png))
+                } else {
+                    stream.write_all(
+                        b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    )
+                };
+            }
+        });
+        base
+    }
 
     #[test]
     fn image_fetch_completes() {
-        let html = r#"<html><body><img src="https://picsum.photos/id/29/300/180" width="300" height="180"></body></html>"#;
-        let mut engine = Engine::new(html, None);
+        // Served locally (via a redirect, which exercises PreserveRequestUrl)
+        // so the test does not depend on any external host being up.
+        let base = serve_image(solid_png(300, 180, [200, 40, 40]));
+        let html = format!(
+            r#"<html><body><img src="{base}/redirect" width="300" height="180"></body></html>"#
+        );
+        let mut engine = Engine::new(&html, None);
         engine.set_scale_factor(1.0);
         engine.sync_viewport(Size::new(800.0, 600.0));
 
